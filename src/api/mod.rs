@@ -14,7 +14,7 @@ mod judgement_state;
 mod second_challenge;
 
 // Reexport
-pub use self::judgement_state::{LookupServer, NotifyAccountState, ResponseAccountState};
+pub use self::judgement_state::{LookupServer, NotifyAccountState};
 pub use self::second_challenge::VerifyChallenge;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Message)]
