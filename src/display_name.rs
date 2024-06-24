@@ -16,6 +16,7 @@ impl DisplayNameVerifier {
     pub fn new(db: Database, config: DisplayNameConfig) -> Self {
         DisplayNameVerifier { db, config }
     }
+
     pub async fn check_similarities(
         &self,
         name: &str,
@@ -47,6 +48,7 @@ impl DisplayNameVerifier {
 
         Ok(violations)
     }
+
     pub async fn verify_display_name(&self, state: &JudgementState) -> Result<()> {
         if !self.config.enabled {
             return Ok(());

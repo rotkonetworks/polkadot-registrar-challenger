@@ -243,6 +243,7 @@ impl Connector {
 
         Ok(actor)
     }
+
     // Request pending judgements every couple of seconds.
     fn start_pending_judgements_task(&self, ctx: &mut Context<Self>) {
         info!("Starting pending judgement requester background task");
@@ -255,6 +256,7 @@ impl Connector {
             },
         );
     }
+
     // Request actively used display names every couple of seconds.
     fn start_active_display_names_task(&self, ctx: &mut Context<Self>) {
         info!("Starting display name requester background task");
@@ -263,6 +265,7 @@ impl Connector {
             ctx.address().do_send(ClientCommand::RequestDisplayNames)
         });
     }
+
     // Look for verified identities and submit those to the Watcher.
     fn start_judgement_candidates_task(&self, ctx: &mut Context<Self>) {
         info!("Starting judgement candidate submitter background task");
@@ -709,6 +712,7 @@ pub mod tests {
                 ]),
             }
         }
+
         pub fn bob() -> Self {
             JudgementRequest {
                 address: "1b3NhsSEqWSQwS6nPGKgCrSjv9Kp13CnhraLV5Coyd8ooXB"
@@ -754,14 +758,17 @@ pub mod tests {
                 inserted_states,
             }
         }
+
         /// A message received from the Watcher (mocked).
         pub async fn inject(&self, msg: WatcherMessage) {
             self.addr.send(msg).await.unwrap().unwrap();
         }
+
         pub async fn inserted_states(&self) -> Vec<JudgementState> {
             let mut states = self.inserted_states.write().await;
             std::mem::take(&mut states)
         }
+
         /// A list of messages that were sent to the Watcher (mocked).
         #[cfg(test)]
         pub fn outgoing(&mut self) -> (Vec<ClientCommand>, OutgoingCounter) {

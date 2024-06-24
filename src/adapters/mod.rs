@@ -150,6 +150,7 @@ impl AdapterListener {
     pub async fn new(db: Database) -> Self {
         AdapterListener { db }
     }
+
     pub async fn start_message_adapter<T>(&self, mut adapter: T, timeout: u64)
     where
         T: 'static + Adapter + Send,
@@ -238,6 +239,7 @@ pub mod tests {
                 messages: Arc::new(Mutex::new(vec![])),
             }
         }
+
         pub async fn send(&self, msg: ExternalMessage) {
             let mut lock = self.messages.lock().await;
             (*lock).push(msg);
@@ -251,10 +253,12 @@ pub mod tests {
         fn name(&self) -> &'static str {
             "test_state_injector"
         }
+
         async fn fetch_messages(&mut self) -> Result<Vec<ExternalMessage>> {
             let mut lock = self.messages.lock().await;
             Ok(std::mem::take(&mut *lock))
         }
+
         async fn send_message(&mut self, _to: &str, _content: Self::MessageType) -> Result<()> {
             unimplemented!()
         }

@@ -206,11 +206,13 @@ impl Adapter for MatrixClient {
     fn name(&self) -> &'static str {
         "Matrix"
     }
+
     async fn fetch_messages(&mut self) -> Result<Vec<ExternalMessage>> {
         let mut lock = self.messages.lock().await;
         // Return messages and wipe inner field.
         Ok(std::mem::take(&mut *lock))
     }
+
     async fn send_message(&mut self, _to: &str, _content: Self::MessageType) -> Result<()> {
         unimplemented!()
     }

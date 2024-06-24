@@ -49,26 +49,32 @@ impl EmailClientBuilder {
             password: None,
         }
     }
+
     pub fn smtp_server(mut self, server: String) -> Self {
         self.server = Some(server);
         self
     }
+
     pub fn imap_server(mut self, imap_server: String) -> Self {
         self.imap_server = Some(imap_server);
         self
     }
+
     pub fn email_inbox(mut self, inbox: String) -> Self {
         self.inbox = Some(inbox);
         self
     }
+
     pub fn email_user(mut self, user: String) -> Self {
         self.user = Some(user);
         self
     }
+
     pub fn email_password(mut self, password: String) -> Self {
         self.password = Some(password);
         self
     }
+
     #[allow(clippy::or_fun_call)]
     pub fn build(self) -> Result<EmailClient> {
         Ok(EmailClient {
@@ -192,6 +198,7 @@ impl EmailClient {
 
         Ok(parsed_messages)
     }
+
     async fn send_message(&self, to: &str, message: &str) -> Result<()> {
         // SMTP transport
         let smtp = SmtpTransport::relay(&self.smtp_server)?
@@ -224,9 +231,11 @@ impl Adapter for EmailClient {
     fn name(&self) -> &'static str {
         "email"
     }
+
     async fn fetch_messages(&mut self) -> Result<Vec<ExternalMessage>> {
         self.request_messages()
     }
+
     async fn send_message(&mut self, to: &str, content: Self::MessageType) -> Result<()> {
         Self::send_message(self, to, content.value.as_str()).await
     }

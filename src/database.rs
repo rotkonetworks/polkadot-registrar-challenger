@@ -29,6 +29,7 @@ impl<T: Serialize> ToBson for T {
     fn to_bson(&self) -> Result<Bson> {
         Ok(to_bson(self)?)
     }
+
     fn to_document(&self) -> Result<Document> {
         Ok(to_document(self)?)
     }
@@ -87,6 +88,7 @@ impl Database {
 
         Ok(Database { client, db })
     }
+
     async fn start_transaction(&self) -> Result<ClientSession> {
         let mut options = TransactionOptions::default();
         options.max_commit_time = Some(Duration::from_secs(30));
@@ -95,6 +97,7 @@ impl Database {
         session.start_transaction(Some(options)).await?;
         Ok(session)
     }
+
     /// Simply checks if a connection could be established to the database.
     pub async fn connectivity_check(&self) -> Result<()> {
         self.db
@@ -103,6 +106,7 @@ impl Database {
             .map_err(|err| anyhow!("Failed to connect to database: {:?}", err))
             .map(|_| ())
     }
+
     pub async fn add_judgement_request(&self, request: &JudgementState) -> Result<bool> {
         let mut session = self.start_transaction().await?;
         let coll = self.db.collection(IDENTITY_COLLECTION);
@@ -201,6 +205,7 @@ impl Database {
 
         Ok(true)
     }
+
     #[cfg(test)]
     pub async fn delete_judgement(&self, context: &IdentityContext) -> Result<()> {
         let coll = self.db.collection::<JudgementState>(IDENTITY_COLLECTION);
@@ -220,6 +225,7 @@ impl Database {
 
         Ok(())
     }
+
     pub async fn verify_manually(
         &self,
         context: &IdentityContext,
@@ -338,6 +344,7 @@ impl Database {
 
         Ok(Some(()))
     }
+
     pub async fn verify_message(&self, message: &ExternalMessage) -> Result<()> {
         let mut session = self.start_transaction().await?;
         let coll = self.db.collection(IDENTITY_COLLECTION);
@@ -458,6 +465,7 @@ impl Database {
 
         Ok(())
     }
+
     /// Check if all fields have been verified.
     async fn process_fully_verified(
         &self,
@@ -535,6 +543,7 @@ impl Database {
 
         Ok(())
     }
+
     pub async fn verify_second_challenge(&self, mut request: VerifyChallenge) -> Result<bool> {
         let mut session = self.start_transaction().await?;
         let coll = self.db.collection::<JudgementState>(IDENTITY_COLLECTION);
@@ -629,6 +638,7 @@ impl Database {
 
         Ok(verified)
     }
+
     pub async fn fetch_second_challenge(
         &self,
         context: &IdentityContext,
@@ -673,6 +683,7 @@ impl Database {
             Err(anyhow!("No entry found for {:?}", field))
         }
     }
+
     pub async fn fetch_events(
         &mut self,
         event_tracker: &mut EventCursor,
@@ -731,6 +742,7 @@ impl Database {
             .map(|wrapper| wrapper.event.message)
             .collect())
     }
+
     pub async fn fetch_judgement_state(
         &self,
         context: &IdentityContext,
@@ -754,6 +766,7 @@ impl Database {
             Ok(None)
         }
     }
+
     pub async fn fetch_judgement_candidates(
         &self,
         network: ChainName,
@@ -781,6 +794,7 @@ impl Database {
 
         Ok(completed)
     }
+
     // (Warning) This fully verifies the identity without having to verify
     // individual fields.
     pub async fn full_manual_verification(&self, context: &IdentityContext) -> Result<bool> {
@@ -854,6 +868,7 @@ impl Database {
             Ok(false)
         }
     }
+
     pub async fn set_judged(&self, context: &IdentityContext) -> Result<()> {
         let mut session = self.start_transaction().await?;
         let coll = self.db.collection::<JudgementState>(IDENTITY_COLLECTION);
@@ -889,6 +904,7 @@ impl Database {
 
         Ok(())
     }
+
     pub async fn insert_display_name(&self, name: &DisplayNameEntry) -> Result<()> {
         let coll = self.db.collection::<DisplayNameEntry>(DISPLAY_NAMES);
 
@@ -910,6 +926,7 @@ impl Database {
 
         Ok(())
     }
+
     pub async fn fetch_display_names(&self, chain: ChainName) -> Result<Vec<DisplayNameEntry>> {
         let coll = self.db.collection::<DisplayNameEntry>(DISPLAY_NAMES);
 
@@ -929,6 +946,7 @@ impl Database {
 
         Ok(names)
     }
+
     pub async fn set_display_name_valid(&self, state: &JudgementState) -> Result<()> {
         let mut session = self.start_transaction().await?;
         let coll = self.db.collection::<()>(IDENTITY_COLLECTION);
@@ -976,6 +994,7 @@ impl Database {
 
         Ok(())
     }
+
     pub async fn insert_display_name_violations(
         &self,
         context: &IdentityContext,
@@ -1003,6 +1022,7 @@ impl Database {
 
         Ok(())
     }
+
     async fn insert_event<T: Into<Event>>(
         &self,
         event: T,

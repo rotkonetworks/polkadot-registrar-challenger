@@ -72,22 +72,27 @@ impl TwitterBuilder {
             token_secret: None,
         }
     }
+
     pub fn consumer_key(mut self, key: String) -> Self {
         self.consumer_key = Some(key);
         self
     }
+
     pub fn consumer_secret(mut self, key: String) -> Self {
         self.consumer_secret = Some(key);
         self
     }
+
     pub fn token(mut self, token: String) -> Self {
         self.token = Some(token);
         self
     }
+
     pub fn token_secret(mut self, secret: String) -> Self {
         self.token_secret = Some(secret);
         self
     }
+
     pub fn build(self) -> Result<TwitterClient> {
         Ok(TwitterClient {
             client: Client::new(),
@@ -202,6 +207,7 @@ impl TwitterClient {
 
         Ok(parsed_messages)
     }
+
     /// Creates a signature as documented here:
     /// https://developer.twitter.com/en/docs/authentication/oauth-1-0a/creating-a-signature
     fn authenticate_request(
@@ -278,6 +284,7 @@ impl TwitterClient {
 
         Ok(())
     }
+
     async fn get_request<T: DeserializeOwned>(
         &self,
         url: &str,
@@ -304,6 +311,7 @@ impl TwitterClient {
 
         serde_json::from_str::<T>(&txt).map_err(|err| err.into())
     }
+
     async fn lookup_twitter_id(
         &self,
         twitter_ids: Option<&[&TwitterId]>,
@@ -397,9 +405,11 @@ impl Adapter for TwitterClient {
     fn name(&self) -> &'static str {
         "Twitter"
     }
+
     async fn fetch_messages(&mut self) -> Result<Vec<ExternalMessage>> {
         self.request_messages().await
     }
+
     async fn send_message(&mut self, _to: &str, _content: Self::MessageType) -> Result<()> {
         unimplemented!()
     }

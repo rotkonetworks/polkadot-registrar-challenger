@@ -150,6 +150,7 @@ impl ExpectedMessage {
             is_verified: false,
         }
     }
+
     pub fn is_message_valid(&self, message: &ExternalMessage) -> bool {
         for value in &message.values {
             if value.0.contains(&self.value) {
@@ -159,10 +160,12 @@ impl ExpectedMessage {
 
         false
     }
+
     #[cfg(test)]
     pub fn set_verified(&mut self) {
         self.is_verified = true;
     }
+
     #[cfg(test)]
     pub fn to_message_parts(&self) -> Vec<MessagePart> {
         vec![self.value.clone().into()]
@@ -197,6 +200,7 @@ impl IdentityFieldValue {
             IdentityFieldValue::Additional(_) => (AccountType::Additional, String::new()),
         }
     }
+
     pub fn matches_type(&self, ty: &AccountType, value: &str) -> bool {
         match (self, ty) {
             (IdentityFieldValue::LegalName(val), AccountType::LegalName) => val == value,
@@ -211,6 +215,7 @@ impl IdentityFieldValue {
             _ => false,
         }
     }
+
     pub fn matches_origin(&self, message: &ExternalMessage) -> bool {
         match self {
             IdentityFieldValue::Email(n1) => match &message.origin {
@@ -338,11 +343,13 @@ impl JudgementState {
             fields: fields.into_iter().map(IdentityField::new).collect(),
         }
     }
+
     pub fn check_full_verification(&self) -> bool {
         self.fields
             .iter()
             .all(|field| field.challenge.is_verified())
     }
+
     pub fn display_name(&self) -> Option<&str> {
         self.fields
             .iter()
@@ -352,6 +359,7 @@ impl JudgementState {
                 _ => panic!("Failed to get display name. This is a bug."),
             })
     }
+
     pub fn has_same_fields_as(&self, other: &HashMap<AccountType, String>) -> bool {
         if other.len() != self.fields.len() {
             return false;
@@ -369,6 +377,7 @@ impl JudgementState {
 
         true
     }
+
     pub fn as_verified_entries(&self) -> Vec<VerifiedEntry> {
         let mut list = vec![];
 
@@ -431,10 +440,12 @@ impl Timestamp {
 
         Timestamp(time)
     }
+
     pub fn with_offset(offset: u64) -> Self {
         let now = Self::now();
         Timestamp(now.0 + offset)
     }
+
     pub fn max(self, other: Timestamp) -> Self {
         if self.0 >= other.0 {
             self
@@ -442,6 +453,7 @@ impl Timestamp {
             other
         }
     }
+
     pub fn raw(&self) -> u64 {
         self.0
     }
@@ -564,6 +576,7 @@ mod tests {
                 chain: ChainName::Polkadot,
             }
         }
+
         pub fn bob() -> Self {
             IdentityContext {
                 address: ChainAddress(
@@ -591,9 +604,11 @@ mod tests {
                 ],
             }
         }
+
         pub fn get_field<'a>(&'a self, ty: &IdentityFieldValue) -> &'a IdentityField {
             self.fields.iter().find(|field| &field.value == ty).unwrap()
         }
+
         pub fn get_field_mut<'a>(&'a mut self, ty: &IdentityFieldValue) -> &'a mut IdentityField {
             self.fields
                 .iter_mut()
@@ -617,14 +632,17 @@ mod tests {
         pub fn ALICE_DISPLAY_NAME() -> Self {
             IdentityFieldValue::DisplayName("Alice".to_string())
         }
+
         #[allow(non_snake_case)]
         pub fn ALICE_EMAIL() -> Self {
             IdentityFieldValue::Email("alice@email.com".to_string())
         }
+
         #[allow(non_snake_case)]
         pub fn ALICE_MATRIX() -> Self {
             IdentityFieldValue::Matrix("@alice:matrix.org".to_string())
         }
+
         #[allow(non_snake_case)]
         pub fn ALICE_TWITTER() -> Self {
             IdentityFieldValue::Twitter("@alice".to_string())
@@ -647,6 +665,7 @@ mod tests {
                 _ => panic!(),
             }
         }
+
         pub fn expected_message_mut(&mut self) -> &mut ExpectedMessage {
             match &mut self.challenge {
                 ChallengeType::ExpectedMessage {
@@ -656,6 +675,7 @@ mod tests {
                 _ => panic!(),
             }
         }
+
         pub fn expected_second(&self) -> &ExpectedMessage {
             match &self.challenge {
                 ChallengeType::ExpectedMessage {
@@ -665,6 +685,7 @@ mod tests {
                 _ => panic!(),
             }
         }
+
         pub fn expected_second_mut(&mut self) -> &mut ExpectedMessage {
             match &mut self.challenge {
                 ChallengeType::ExpectedMessage {
@@ -674,9 +695,11 @@ mod tests {
                 _ => panic!(),
             }
         }
+
         pub fn failed_attempts_mut(&mut self) -> &mut usize {
             &mut self.failed_attempts
         }
+
         // rename, without "expected"
         pub fn expected_display_name_check_mut(
             &mut self,
@@ -686,6 +709,7 @@ mod tests {
                 _ => panic!(),
             }
         }
+
         pub fn expected_unsupported_mut(&mut self) -> &mut Option<bool> {
             match &mut self.challenge {
                 ChallengeType::Unsupported { is_verified } => is_verified,
