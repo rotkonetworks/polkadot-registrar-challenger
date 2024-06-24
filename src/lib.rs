@@ -202,7 +202,8 @@ pub async fn run() -> Result<()> {
         }
         InstanceType::SingleInstance(config) => {
             info!("Starting adapter listener and session notifier instances");
-            let (adapter_config, notifier_config) = (config.adapter.unwrap(), config.notifier.unwrap());
+            let (adapter_config, notifier_config) =
+                (config.adapter.unwrap(), config.notifier.unwrap());
 
             config_adapter_listener(db.clone(), adapter_config).await?;
             config_session_notifier(db, notifier_config).await?;

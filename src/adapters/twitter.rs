@@ -146,10 +146,7 @@ impl TwitterClient {
         params.push(("event_types", "MessageCreate"));
         params.push(("dm_event.fields", "id,text,created_at,sender_id"));
         let mut messages = self
-            .get_request::<ApiMessageRequest>(
-                &url,
-                Some(&params),
-            )
+            .get_request::<ApiMessageRequest>(&url, Some(&params))
             .await?
             .parse()?;
 
@@ -347,19 +344,22 @@ impl TwitterClient {
 
         debug!("Params: {:?}", params);
 
-        let user_response = self.get_request::<UserResponse>(&url, Some(&params)).await?;
+        let user_response = self
+            .get_request::<UserResponse>(&url, Some(&params))
+            .await?;
 
         if user_response.data.is_empty() {
             return Err(anyhow!("unrecognized data"));
         }
 
-        let result = user_response.data
+        let result = user_response
+            .data
             .into_iter()
             .map(|user| {
                 let id = TwitterId(user.id.parse().expect("Failed to parse user ID"));
                 (id, format!("@{}", user.name.to_lowercase()))
             })
-            .collect();    
+            .collect();
         Ok(result)
     }
 }
@@ -374,7 +374,7 @@ struct ApiMessage {
     sender_id: Option<String>,
     id: String,
     created_at: Option<String>,
-    text: String
+    text: String,
 }
 
 impl ApiMessageRequest {
