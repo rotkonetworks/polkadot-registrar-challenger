@@ -9,3 +9,4 @@ config*
 scripts/load-env.sh
 node_modules
 .idea
+.DS_Store
