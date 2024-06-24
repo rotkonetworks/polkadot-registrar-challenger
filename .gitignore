@@ -8,3 +8,4 @@ config*
 !www/config.json
 scripts/load-env.sh
 node_modules
+.idea
