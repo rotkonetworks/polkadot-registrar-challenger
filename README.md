@@ -81,66 +81,9 @@ verify 1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP displayname email
 
 ## Setup
 
-### Config
+### Configuration
 
-Both types of configuration, respectively the _adapter listener_ and _session notifier_ can be seen in the [`config/`](./config) directory.
-
-#### Adapter Listener
-
-```yaml
-db:
-  uri: mongodb://localhost:27017/
-  name: registrar_db
-instance:
-  role: adapter_listener
-  config:
-    watcher:
-      - network: kusama
-        endpoint: ws://localhost:8000
-      - network: polkadot
-        endpoint: ws://localhost:8001
-    matrix:
-      enabled: false
-      homeserver: homeserver
-      username: username
-      password: password
-      db_path: db_path
-      admins: null
-    twitter:
-      enabled: false
-      api_key: key
-      api_secret: secret
-      token: token
-      token_secret: secret
-      request_interval: 300
-    email:
-      enabled: false
-      smtp_server: server
-      imap_server: server
-      inbox: inbox
-      user: user
-      password: password
-      request_interval: 5
-    display_name:
-      enabled: true
-      limit: 0.85
-```
-
-#### Session Notifier
-
-```yaml
-db:
-  uri: mongodb://localhost:27017/
-  name: registrar_db
-instance:
-  role: session_notifier
-  config:
-    api_address: 0.0.0.0:8000
-    display_name:
-      enabled: true
-      limit: 0.85
-
-```
+The application reads settings from `config.yaml` or `/etc/registrar/config.yaml`. See the [example configuration](./config.example.yaml) for details.
 
 ### Building
 

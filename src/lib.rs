@@ -36,7 +36,8 @@ mod tests;
 struct Config {
     pub log_level: LogLevel,
     pub db: DatabaseConfig,
-    pub instance: InstanceType,
+    pub adapter: Option<AdapterConfig>,
+    pub notifier: Option<NotifierConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,21 +60,6 @@ impl LogLevel {
             LogLevel::Trace => "trace",
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "role", content = "config")]
-enum InstanceType {
-    AdapterListener(AdapterNotifierConfig),
-    SessionNotifier(AdapterNotifierConfig),
-    SingleInstance(AdapterNotifierConfig),
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct AdapterNotifierConfig {
-    pub adapter: Option<AdapterConfig>,
-    pub notifier: Option<NotifierConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -178,11 +164,12 @@ async fn config_session_notifier(db: Database, not_config: NotifierConfig) -> Re
 }
 
 pub async fn run() -> Result<()> {
-    let root = open_config()?;
-    let (db_config, instance) = (root.db, root.instance);
+    let config = open_config()?;
+    println!("{:#?}", config);
+    let db_config = config.db;
 
     tracing_subscriber::fmt()
-        .with_env_filter(format!("system={}", root.log_level.as_str()))
+        .with_env_filter(format!("system={}", config.log_level.as_str()))
         .init();
 
     info!("Starting registrar service");
@@ -191,23 +178,13 @@ pub async fn run() -> Result<()> {
     let db = Database::new(&db_config.uri, &db_config.name).await?;
     db.connectivity_check().await?;
 
-    match instance {
-        InstanceType::AdapterListener(config) => {
-            info!("Starting adapter listener instance");
-            config_adapter_listener(db, config.adapter.unwrap()).await?;
-        }
-        InstanceType::SessionNotifier(config) => {
-            info!("Starting session notifier instance");
-            config_session_notifier(db, config.notifier.unwrap()).await?;
-        }
-        InstanceType::SingleInstance(config) => {
-            info!("Starting adapter listener and session notifier instances");
-            let (adapter_config, notifier_config) =
-                (config.adapter.unwrap(), config.notifier.unwrap());
-
-            config_adapter_listener(db.clone(), adapter_config).await?;
-            config_session_notifier(db, notifier_config).await?;
-        }
+    if let Some(adapter_config) = config.adapter {
+        info!("Starting adapter listener instance");
+        config_adapter_listener(db.clone(), adapter_config).await?;
+    }
+    if let Some(notifier_config) = config.notifier {
+        info!("Starting session notifier instance");
+        config_session_notifier(db, notifier_config).await?;
     }
 
     info!("Setup completed");
