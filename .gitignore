@@ -2,7 +2,6 @@ target
 www/dist
 www/build
 config.yaml
-scripts/load-env.sh
 node_modules
 .idea
 .DS_Store
