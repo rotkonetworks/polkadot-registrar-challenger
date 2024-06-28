@@ -136,9 +136,8 @@ pub struct EmailConfig {
 fn open_config() -> Result<Config> {
     // Open config file.
     let content = fs::read_to_string("config.yaml")
-        .or_else(|_| fs::read_to_string("/etc/registrar/config.yaml"))
         .map_err(|_| {
-            anyhow!("Failed to open config at 'config.yaml' or '/etc/registrar/config.yaml'.")
+            anyhow!("Failed to open config at 'config.yaml'.")
         })?;
 
     // Parse config file as JSON.

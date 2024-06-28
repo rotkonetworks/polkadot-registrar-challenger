@@ -83,7 +83,7 @@ verify 1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP displayname email
 
 ### Configuration
 
-The application reads settings from `config.yaml` or `/etc/registrar/config.yaml`. See the [example configuration](./config.example.yaml) for details.
+The application reads settings from `config.yaml`. See the [example configuration](./config.example.yaml) for details.
 
 ### Building
 
