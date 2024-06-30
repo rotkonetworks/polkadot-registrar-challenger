@@ -1,8 +1,8 @@
 [![CircleCI](https://circleci.com/gh/w3f/polkadot-registrar-challenger.svg?style=svg)](https://circleci.com/gh/w3f/polkadot-registrar-challenger)
 
-# Polkadot Registrar Service (beta)
+# Polkadot Registrar Service
 
-❗❗❗ THIS PROJECT IS DECOMMISSIONED AND NO LONGER UPDATED ❗❗❗
+❗❗❗ THIS PROJECT IS CURRENTLY UNDER DEVELOPMENT BY ROTKO NETWORKS ❗❗❗
 
 An automated registrar service for [Polkadot on-chain identities](https://wiki.polkadot.network/docs/learn-identity).
 
