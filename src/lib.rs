@@ -164,7 +164,6 @@ async fn config_session_notifier(db: Database, not_config: NotifierConfig) -> Re
 
 pub async fn run() -> Result<()> {
     let config = open_config()?;
-    println!("{:#?}", config);
     let db_config = config.db;
 
     tracing_subscriber::fmt()
