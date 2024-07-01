@@ -5,3 +5,6 @@ config.yaml
 node_modules
 .idea
 .DS_Store
+
+# Adapter state
+matrix
