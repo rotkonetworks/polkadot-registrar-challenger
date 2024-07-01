@@ -169,7 +169,7 @@ impl AdapterListener {
                 match adapter.fetch_messages().await {
                     Ok(messages) => {
                         for message in messages {
-                            info!("Processing message from: {:?}", message.origin);
+                            info!("Received {:#?}", message);
                             let _ = db
                                 .verify_message(&message)
                                 .await
