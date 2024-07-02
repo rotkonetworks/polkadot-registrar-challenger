@@ -36,7 +36,7 @@ mod tests;
 struct Config {
     pub log_level: LogLevel,
     pub db: DatabaseConfig,
-    pub adapter: Option<AdapterConfig>,
+    pub listener: Option<ListenerConfig>,
     pub notifier: Option<NotifierConfig>,
 }
 
@@ -71,15 +71,7 @@ struct DatabaseConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct NotifierConfig {
-    pub api_address: String,
-    pub cors_allow_origin: Vec<String>,
-    pub display_name: DisplayNameConfig,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct AdapterConfig {
+pub struct ListenerConfig {
     pub watchers: Vec<WatcherConfig>,
     pub matrix: MatrixConfig,
     pub display_name: DisplayNameConfig,
@@ -92,12 +84,6 @@ pub struct WatcherConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct DisplayNameConfig {
-    pub enabled: bool,
-    pub limit: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct MatrixConfig {
     pub enabled: bool,
@@ -106,6 +92,20 @@ pub struct MatrixConfig {
     pub password: String,
     pub db_path: String,
     pub admins: Option<Vec<MatrixHandle>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct NotifierConfig {
+    pub api_address: String,
+    pub cors_allow_origin: Vec<String>,
+    pub display_name: DisplayNameConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DisplayNameConfig {
+    pub enabled: bool,
+    pub limit: f64,
 }
 
 fn open_config() -> Result<Config> {
@@ -122,7 +122,7 @@ fn open_config() -> Result<Config> {
     Ok(config)
 }
 
-async fn config_adapter_listener(db: Database, config: AdapterConfig) -> Result<()> {
+async fn config_listener(db: Database, config: ListenerConfig) -> Result<()> {
     let watchers = config.watchers.clone();
     let dn_config = config.display_name.clone();
     run_adapters(config.clone(), db.clone()).await?;
@@ -151,12 +151,12 @@ pub async fn run() -> Result<()> {
     let db = Database::new(&db_config.uri, &db_config.name).await?;
     db.connectivity_check().await?;
 
-    if let Some(adapter_config) = config.adapter {
-        info!("Starting adapter listener instance");
-        config_adapter_listener(db.clone(), adapter_config).await?;
+    if let Some(adapter_config) = config.listener {
+        info!("Starting listener");
+        config_listener(db.clone(), adapter_config).await?;
     }
     if let Some(notifier_config) = config.notifier {
-        info!("Starting session notifier instance");
+        info!("Starting session notifier");
         config_session_notifier(db, notifier_config).await?;
     }
 

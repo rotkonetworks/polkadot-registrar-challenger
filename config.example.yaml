@@ -2,7 +2,7 @@ log_level: info
 db:
   uri: mongodb://localhost:27017/
   name: registrar_db
-adapter:
+listener:
   watchers:
     - network: kusama
       endpoint: ws://localhost:8000

@@ -2,20 +2,20 @@ use crate::database::{Database, EventCursor};
 use crate::primitives::{
     ExpectedMessage, ExternalMessage, IdentityFieldValue, NotificationMessage,
 };
-use crate::{AdapterConfig, Result};
+use crate::{ListenerConfig, Result};
 use tokio::time::{interval, Duration};
 use tracing::Instrument;
 
 pub mod admin;
 pub mod matrix;
 
-pub async fn run_adapters(config: AdapterConfig, db: Database) -> Result<()> {
+pub async fn run_adapters(config: ListenerConfig, db: Database) -> Result<()> {
     let listener = AdapterListener::new(db.clone()).await;
     // Convenience flat for logging
     let mut started = false;
 
     // Deconstruct struct to get around borrowing violations.
-    let AdapterConfig {
+    let ListenerConfig {
         watchers: _,
         matrix: matrix_config,
         display_name: _,
