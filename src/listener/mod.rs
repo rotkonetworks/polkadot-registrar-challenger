@@ -2,7 +2,7 @@ use crate::database::{Database, EventCursor};
 use crate::primitives::{
     ExpectedMessage, ExternalMessage, IdentityFieldValue, NotificationMessage,
 };
-use crate::{ListenerConfig, Result};
+use crate::{ListenerConfig, MatrixConfig, Result};
 
 use tokio::time::{interval, Duration};
 use tracing::Instrument;
@@ -12,51 +12,38 @@ pub mod matrix;
 
 pub async fn run(config: ListenerConfig, db: Database) -> Result<()> {
     let listener = AdapterListener::new(db.clone()).await;
-    // Convenience flat for logging
-    let mut started = false;
 
-    // Deconstruct struct to get around borrowing violations.
-    let ListenerConfig {
-        watchers: _,
-        matrix: matrix_config,
-        display_name: _,
-    } = config;
+    if config.matrix.enabled {
+        run_matrix_adapter(&listener, config.matrix, db.clone()).await?;
+    }
 
-    // Matrix client configuration and execution.
-    if matrix_config.enabled {
-        let config = matrix_config;
+    Ok(())
+}
 
-        let span = info_span!("matrix_adapter");
-        info!(
-            homeserver = config.homeserver.as_str(),
-            username = config.username.as_str()
-        );
+async fn run_matrix_adapter(listener: &AdapterListener, config: MatrixConfig, db: Database) -> Result<()> {
+    let span = info_span!("matrix_adapter");
+    info!(
+        homeserver = config.homeserver.as_str(),
+        username = config.username.as_str()
+    );
 
-        async {
-            info!("Configuring client");
-            let matrix_client = matrix::MatrixClient::new(
-                &config.homeserver,
-                &config.username,
-                &config.password,
-                &config.db_path,
-                db,
-                config.admins.unwrap_or_default(),
-            )
-            .await?;
+    async {
+        info!("Configuring client");
+        let matrix_client = matrix::MatrixClient::new(
+            &config.homeserver,
+            &config.username,
+            &config.password,
+            &config.db_path,
+            db,
+            config.admins.unwrap_or_default(),
+        ).await?;
 
-            info!("Starting message adapter");
-            listener.start_message_adapter(matrix_client, 1).await;
-            Result::Ok(())
-        }
+        info!("Starting message adapter");
+        listener.start_message_adapter(matrix_client, 1).await;
+        Result::Ok(())
+    }
         .instrument(span)
         .await?;
-
-        started = true;
-    }
-
-    if !started {
-        warn!("No adapters are enabled");
-    }
 
     Ok(())
 }
