@@ -122,9 +122,12 @@ fn open_config() -> Result<Config> {
 }
 
 async fn config_listener(db: Database, config: ListenerConfig) -> Result<()> {
+    if config.matrix.enabled {
+        listener::run_matrix_adapter(config.matrix, db.clone()).await?;
+
+    }
     let watchers = config.watchers.clone();
     let dn_config = config.display_name.clone();
-    listener::run(config.clone(), db.clone()).await?;
     run_connector(db, watchers, dn_config).await
 }
 
