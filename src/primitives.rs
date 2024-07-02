@@ -1,4 +1,4 @@
-use crate::adapters::admin::RawFieldName;
+use crate::listener::admin::RawFieldName;
 use crate::connector::{AccountType, DisplayNameEntry, VerifiedEntry};
 use actix::Message;
 use std::collections::HashMap;

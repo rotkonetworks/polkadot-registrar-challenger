@@ -1,4 +1,4 @@
-use crate::adapters::admin::RawFieldName;
+use crate::listener::admin::RawFieldName;
 use crate::api::VerifyChallenge;
 use crate::connector::DisplayNameEntry;
 use crate::primitives::{

@@ -1,5 +1,5 @@
-use crate::adapters::tests::MessageInjector;
-use crate::adapters::AdapterListener;
+use crate::listener::tests::MessageInjector;
+use crate::listener::AdapterListener;
 use crate::api::{JsonResult, ResponseAccountState};
 use crate::connector::{AccountType, JudgementRequest, WatcherMessage};
 use crate::database::Database;

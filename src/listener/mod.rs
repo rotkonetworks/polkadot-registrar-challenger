@@ -3,13 +3,14 @@ use crate::primitives::{
     ExpectedMessage, ExternalMessage, IdentityFieldValue, NotificationMessage,
 };
 use crate::{ListenerConfig, Result};
+
 use tokio::time::{interval, Duration};
 use tracing::Instrument;
 
 pub mod admin;
 pub mod matrix;
 
-pub async fn run_adapters(config: ListenerConfig, db: Database) -> Result<()> {
+pub async fn run(config: ListenerConfig, db: Database) -> Result<()> {
     let listener = AdapterListener::new(db.clone()).await;
     // Convenience flat for logging
     let mut started = false;
@@ -63,9 +64,11 @@ pub async fn run_adapters(config: ListenerConfig, db: Database) -> Result<()> {
 #[async_trait]
 pub trait Adapter {
     type MessageType;
-
+    
     fn name(&self) -> &'static str;
+
     async fn fetch_messages(&mut self) -> Result<Vec<ExternalMessage>>;
+
     async fn send_message(&mut self, to: &str, content: Self::MessageType) -> Result<()>;
 }
 

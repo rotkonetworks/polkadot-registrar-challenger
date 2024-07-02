@@ -1,5 +1,5 @@
-use crate::adapters::tests::MessageInjector;
-use crate::adapters::AdapterListener;
+use crate::listener::tests::MessageInjector;
+use crate::listener::AdapterListener;
 use crate::database::Database;
 use crate::primitives::{
     ExpectedMessage, ExternalMessage, ExternalMessageType, JudgementState, MessageId, Timestamp,

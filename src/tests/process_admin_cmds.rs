@@ -1,5 +1,5 @@
 use super::*;
-use crate::adapters::admin::{process_admin, Command, RawFieldName, Response};
+use crate::listener::admin::{process_admin, Command, RawFieldName, Response};
 use crate::api::{JsonResult, ResponseAccountState};
 use crate::primitives::{
     IdentityContext, IdentityFieldValue, JudgementStateBlanked, NotificationMessage,

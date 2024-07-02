@@ -8,20 +8,19 @@ extern crate serde;
 extern crate async_trait;
 
 use actix::clock::sleep;
-use adapters::matrix::MatrixHandle;
+use listener::matrix::MatrixHandle;
 use primitives::ChainName;
 use std::fs;
 use std::time::Duration;
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
 
-use adapters::run_adapters;
 use api::run_rest_api_server;
 use connector::run_connector;
 use database::Database;
 use notifier::run_session_notifier;
 
-mod adapters;
+mod listener;
 mod api;
 mod connector;
 mod database;
@@ -125,7 +124,7 @@ fn open_config() -> Result<Config> {
 async fn config_listener(db: Database, config: ListenerConfig) -> Result<()> {
     let watchers = config.watchers.clone();
     let dn_config = config.display_name.clone();
-    run_adapters(config.clone(), db.clone()).await?;
+    listener::run(config.clone(), db.clone()).await?;
     run_connector(db, watchers, dn_config).await
 }
 
