@@ -3,7 +3,7 @@ db:
   uri: mongodb://localhost:27017/
   name: registrar_db
 adapter:
-  watcher:
+  watchers:
     - network: kusama
       endpoint: ws://localhost:8000
     - network: polkadot

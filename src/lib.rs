@@ -80,7 +80,7 @@ pub struct NotifierConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AdapterConfig {
-    pub watcher: Vec<WatcherConfig>,
+    pub watchers: Vec<WatcherConfig>,
     pub matrix: MatrixConfig,
     pub display_name: DisplayNameConfig,
 }
@@ -123,7 +123,7 @@ fn open_config() -> Result<Config> {
 }
 
 async fn config_adapter_listener(db: Database, config: AdapterConfig) -> Result<()> {
-    let watchers = config.watcher.clone();
+    let watchers = config.watchers.clone();
     let dn_config = config.display_name.clone();
     run_adapters(config.clone(), db.clone()).await?;
     run_connector(db, watchers, dn_config).await

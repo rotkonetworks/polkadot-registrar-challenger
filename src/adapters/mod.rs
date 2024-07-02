@@ -16,7 +16,7 @@ pub async fn run_adapters(config: AdapterConfig, db: Database) -> Result<()> {
 
     // Deconstruct struct to get around borrowing violations.
     let AdapterConfig {
-        watcher: _,
+        watchers: _,
         matrix: matrix_config,
         display_name: _,
     } = config;
