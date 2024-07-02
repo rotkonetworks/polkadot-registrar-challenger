@@ -7,9 +7,7 @@ use tokio::time::{interval, Duration};
 use tracing::Instrument;
 
 pub mod admin;
-pub mod email;
 pub mod matrix;
-pub mod twitter;
 
 pub async fn run_adapters(config: AdapterConfig, db: Database) -> Result<()> {
     let listener = AdapterListener::new(db.clone()).await;
@@ -20,8 +18,6 @@ pub async fn run_adapters(config: AdapterConfig, db: Database) -> Result<()> {
     let AdapterConfig {
         watcher: _,
         matrix: matrix_config,
-        twitter: twitter_config,
-        email: email_config,
         display_name: _,
     } = config;
 
@@ -49,70 +45,6 @@ pub async fn run_adapters(config: AdapterConfig, db: Database) -> Result<()> {
 
             info!("Starting message adapter");
             listener.start_message_adapter(matrix_client, 1).await;
-            Result::Ok(())
-        }
-        .instrument(span)
-        .await?;
-
-        started = true;
-    }
-
-    // Twitter client configuration and execution.
-    if twitter_config.enabled {
-        let config = twitter_config;
-
-        let span = info_span!("twitter_adapter");
-        info!(api_key = config.api_key.as_str());
-
-        async {
-            info!("Configuring client");
-            let twitter_client = twitter::TwitterBuilder::new()
-                .consumer_key(config.api_key)
-                .consumer_secret(config.api_secret)
-                .token(config.token)
-                .token_secret(config.token_secret)
-                .build()?;
-
-            info!("Starting message adapter");
-            listener
-                .start_message_adapter(twitter_client, config.request_interval)
-                .await;
-
-            Result::Ok(())
-        }
-        .instrument(span)
-        .await?;
-
-        started = true;
-    }
-
-    // Email client configuration and execution.
-    if email_config.enabled {
-        let config = email_config;
-
-        let span = info_span!("email_adapter");
-        info!(
-            smtp_server = config.smtp_server.as_str(),
-            imap_server = config.imap_server.as_str(),
-            inbox = config.inbox.as_str(),
-            user = config.user.as_str(),
-        );
-
-        async {
-            info!("Configuring client");
-            let email_client = email::EmailClientBuilder::new()
-                .smtp_server(config.smtp_server)
-                .imap_server(config.imap_server)
-                .email_inbox(config.inbox)
-                .email_user(config.user)
-                .email_password(config.password)
-                .build()?;
-
-            info!("Starting message adapter");
-            listener
-                .start_message_adapter(email_client, config.request_interval)
-                .await;
-
             Result::Ok(())
         }
         .instrument(span)

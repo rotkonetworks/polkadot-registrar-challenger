@@ -82,8 +82,6 @@ pub struct NotifierConfig {
 pub struct AdapterConfig {
     pub watcher: Vec<WatcherConfig>,
     pub matrix: MatrixConfig,
-    pub twitter: TwitterConfig,
-    pub email: EmailConfig,
     pub display_name: DisplayNameConfig,
 }
 
@@ -108,29 +106,6 @@ pub struct MatrixConfig {
     pub password: String,
     pub db_path: String,
     pub admins: Option<Vec<MatrixHandle>>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct TwitterConfig {
-    pub enabled: bool,
-    pub api_key: String,
-    pub api_secret: String,
-    pub token: String,
-    pub token_secret: String,
-    pub request_interval: u64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct EmailConfig {
-    pub enabled: bool,
-    pub smtp_server: String,
-    pub imap_server: String,
-    pub inbox: String,
-    pub user: String,
-    pub password: String,
-    pub request_interval: u64,
 }
 
 fn open_config() -> Result<Config> {
