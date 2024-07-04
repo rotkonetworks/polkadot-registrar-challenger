@@ -8,17 +8,17 @@ extern crate serde;
 extern crate async_trait;
 
 mod matrix;
-mod blockchain;
+mod watcher;
 mod database;
 mod display_name;
 
 use actix::clock::sleep;
 use matrix::Nickname;
-use blockchain::ChainName;
+use watcher::ChainName;
 use std::fs;
 use std::time::Duration;
 
-use blockchain::run_connector;
+use watcher::run_connector;
 use database::Database;
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;

@@ -7,7 +7,7 @@ use matrix_sdk::{Client, ClientConfig, EventHandler, SyncSettings};
 use std::str::FromStr;
 use tokio::time::{self, Duration};
 use url::Url;
-use crate::blockchain::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
+use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
 const REJOIN_DELAY: u64 = 10;
 const REJOIN_MAX_ATTEMPTS: usize = 5;
