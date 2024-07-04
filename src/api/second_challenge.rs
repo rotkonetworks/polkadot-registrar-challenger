@@ -1,6 +1,6 @@
 use super::JsonResult;
 use crate::database::Database;
-use crate::primitives::IdentityFieldValue;
+use crate::base::IdentityFieldValue;
 use actix::prelude::*;
 use actix_web::{web, HttpResponse};
 

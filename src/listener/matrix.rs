@@ -1,6 +1,6 @@
 use crate::listener::admin::{process_admin, Command, Response};
 use crate::listener::Adapter;
-use crate::primitives::{ExternalMessage, ExternalMessageType, Timestamp};
+use crate::base::{ExternalMessage, ExternalMessageType, Timestamp};
 use crate::{Database, Result};
 use matrix_sdk::events::room::member::MemberEventContent;
 use matrix_sdk::events::room::message::{MessageEventContent, MessageType, TextMessageEventContent};

@@ -1,5 +1,5 @@
 use crate::database::{Database, EventCursor};
-use crate::primitives::{
+use crate::base::{
     ExpectedMessage, ExternalMessage, IdentityFieldValue, NotificationMessage,
 };
 use crate::{MatrixConfig, Result};

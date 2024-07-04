@@ -1,5 +1,5 @@
 use crate::display_name::DisplayNameVerifier;
-use crate::primitives::{
+use crate::base::{
     ChainAddress, ChainName, IdentityContext, IdentityFieldValue, JudgementState, Timestamp,
 };
 use crate::{Database, DisplayNameConfig, Result, WatcherConfig};

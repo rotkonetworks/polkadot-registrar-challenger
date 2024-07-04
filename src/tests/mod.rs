@@ -4,7 +4,7 @@ use crate::api::{JsonResult, ResponseAccountState};
 use crate::connector::{AccountType, JudgementRequest, WatcherMessage};
 use crate::database::Database;
 use crate::notifier::run_session_notifier;
-use crate::primitives::{IdentityContext, IdentityFieldValue};
+use crate::base::{IdentityContext, IdentityFieldValue};
 use crate::{api::tests::run_test_server, connector::tests::ConnectorMocker};
 use actix_codec::{AsyncRead, AsyncWrite, Framed};
 use actix_http::ws::Codec;

@@ -1,7 +1,7 @@
 use super::JsonResult;
 use crate::connector::DisplayNameEntry;
 use crate::database::Database;
-use crate::primitives::ChainName;
+use crate::base::ChainName;
 use crate::{display_name::DisplayNameVerifier, DisplayNameConfig};
 use actix::prelude::*;
 use actix_web::{web, HttpResponse};

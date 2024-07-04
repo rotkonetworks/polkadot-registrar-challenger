@@ -1,6 +1,6 @@
 use super::JsonResult;
 use crate::database::Database;
-use crate::primitives::{IdentityContext, JudgementStateBlanked, NotificationMessage};
+use crate::base::{IdentityContext, JudgementStateBlanked, NotificationMessage};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_web_actors::ws;

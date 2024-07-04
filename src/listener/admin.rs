@@ -1,4 +1,4 @@
-use crate::primitives::{ChainAddress, ChainName, IdentityContext, JudgementStateBlanked};
+use crate::base::{ChainAddress, ChainName, IdentityContext, JudgementStateBlanked};
 use crate::Database;
 use std::str::FromStr;
 
@@ -232,7 +232,7 @@ pub fn create_context(address: ChainAddress) -> IdentityContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::JudgementState;
+    use crate::base::JudgementState;
 
     #[test]
     fn command_status() {

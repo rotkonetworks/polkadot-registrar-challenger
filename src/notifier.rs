@@ -1,6 +1,6 @@
 use crate::api::{LookupServer, NotifyAccountState};
 use crate::database::{Database, EventCursor};
-use crate::primitives::{IdentityContext, JudgementState};
+use crate::base::{IdentityContext, JudgementState};
 use crate::Result;
 use actix::prelude::*;
 use std::collections::HashMap;

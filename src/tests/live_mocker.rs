@@ -1,7 +1,7 @@
 use crate::listener::tests::MessageInjector;
 use crate::listener::AdapterListener;
 use crate::database::Database;
-use crate::primitives::{
+use crate::base::{
     ExpectedMessage, ExternalMessage, ExternalMessageType, JudgementState, MessageId, Timestamp,
 };
 use crate::tests::F;

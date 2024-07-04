@@ -9,7 +9,7 @@ extern crate async_trait;
 
 use actix::clock::sleep;
 use listener::matrix::MatrixHandle;
-use primitives::ChainName;
+use base::ChainName;
 use std::fs;
 use std::time::Duration;
 
@@ -26,7 +26,7 @@ mod connector;
 mod database;
 mod display_name;
 mod notifier;
-mod primitives;
+mod base;
 #[cfg(test)]
 mod tests;
 

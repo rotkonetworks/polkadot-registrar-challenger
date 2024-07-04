@@ -2,7 +2,7 @@ use super::*;
 use crate::api::{JsonResult, ResponseAccountState};
 use crate::connector::DisplayNameEntry;
 use crate::display_name::DisplayNameVerifier;
-use crate::primitives::{IdentityContext, IdentityFieldValue};
+use crate::base::{IdentityContext, IdentityFieldValue};
 use crate::DisplayNameConfig;
 use futures::StreamExt;
 

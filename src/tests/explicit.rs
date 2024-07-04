@@ -2,7 +2,7 @@
 #![allow(clippy::bool_assert_comparison)]
 
 use super::*;
-use crate::primitives::JudgementState;
+use crate::base::JudgementState;
 
 #[actix::test]
 async fn default_state() {

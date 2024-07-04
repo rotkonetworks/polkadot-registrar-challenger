@@ -1,7 +1,7 @@
 use crate::listener::admin::RawFieldName;
 use crate::api::VerifyChallenge;
 use crate::connector::DisplayNameEntry;
-use crate::primitives::{
+use crate::base::{
     ChainName, ChallengeType, Event, ExpectedMessage, ExternalMessage, IdentityContext,
     IdentityFieldValue, JudgementState, NotificationMessage, Timestamp,
 };

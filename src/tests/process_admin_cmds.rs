@@ -1,7 +1,7 @@
 use super::*;
 use crate::listener::admin::{process_admin, Command, RawFieldName, Response};
 use crate::api::{JsonResult, ResponseAccountState};
-use crate::primitives::{
+use crate::base::{
     IdentityContext, IdentityFieldValue, JudgementStateBlanked, NotificationMessage,
 };
 use futures::{FutureExt, StreamExt};

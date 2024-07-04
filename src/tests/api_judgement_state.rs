@@ -2,7 +2,7 @@ use super::*;
 use crate::api::VerifyChallenge;
 use crate::api::{JsonResult, ResponseAccountState};
 use crate::connector::WatcherMessage;
-use crate::primitives::{
+use crate::base::{
     ExpectedMessage, ExternalMessage, ExternalMessageType, IdentityContext, MessageId,
     NotificationMessage, Timestamp,
 };

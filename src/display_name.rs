@@ -1,6 +1,6 @@
 use crate::connector::DisplayNameEntry;
 use crate::database::Database;
-use crate::primitives::{ChainName, IdentityContext, JudgementState};
+use crate::base::{ChainName, IdentityContext, JudgementState};
 use crate::{DisplayNameConfig, Result};
 use strsim::jaro;
 
