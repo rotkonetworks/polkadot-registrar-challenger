@@ -1,10 +1,6 @@
-use crate::listener::admin::RawFieldName;
 use crate::api::VerifyChallenge;
 use crate::connector::DisplayNameEntry;
-use crate::base::{
-    ChainName, ChallengeType, Event, ExpectedMessage, ExternalMessage, IdentityContext,
-    IdentityFieldValue, JudgementState, NotificationMessage, Timestamp,
-};
+use crate::base::{ChainName, ChallengeType, Event, ExpectedMessage, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
 use crate::Result;
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use futures::StreamExt;

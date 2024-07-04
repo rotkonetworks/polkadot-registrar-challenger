@@ -1,9 +1,7 @@
 use super::*;
-use crate::listener::admin::{process_admin, Command, RawFieldName, Response};
+use crate::listener::admin::{Command, process_admin};
 use crate::api::{JsonResult, ResponseAccountState};
-use crate::base::{
-    IdentityContext, IdentityFieldValue, JudgementStateBlanked, NotificationMessage,
-};
+use crate::base::{IdentityContext, IdentityFieldValue, JudgementStateBlanked, NotificationMessage, RawFieldName, Response};
 use futures::{FutureExt, StreamExt};
 
 #[actix::test]
