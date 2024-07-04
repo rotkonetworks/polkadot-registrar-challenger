@@ -7,15 +7,14 @@ extern crate serde;
 #[macro_use]
 extern crate async_trait;
 
-pub mod matrix;
+mod matrix;
 mod blockchain;
 mod database;
 mod display_name;
-mod base;
 
 use actix::clock::sleep;
 use matrix::Nickname;
-use base::ChainName;
+use blockchain::ChainName;
 use std::fs;
 use std::time::Duration;
 

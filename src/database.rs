@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -8,8 +10,7 @@ use mongodb::options::{IndexOptions, TransactionOptions, UpdateOptions};
 use rand::{Rng, thread_rng};
 use serde::Serialize;
 
-use crate::base::{ChainName, ChallengeType, Event, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
-use crate::blockchain::DisplayNameEntry;
+use crate::blockchain::{ChainName, ChallengeType, DisplayNameEntry, Event, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
 use crate::Result;
 
 const IDENTITY_COLLECTION: &str = "identities";

@@ -1,6 +1,5 @@
-use crate::blockchain::DisplayNameEntry;
+use crate::blockchain::{ChainName, DisplayNameEntry, IdentityContext, JudgementState};
 use crate::database::Database;
-use crate::base::{ChainName, IdentityContext, JudgementState};
 use crate::{DisplayNameConfig, Result};
 use strsim::jaro;
 
