@@ -39,7 +39,7 @@ const DISPLAY_NAMES_INTERVAL: u64 = 1;
 #[cfg(test)]
 const JUDGEMENT_CANDIDATES_INTERVAL: u64 = 1;
 
-pub async fn run_connector(
+pub async fn open_connections(
     db: Database,
     watchers: Vec<WatcherConfig>,
     dn_config: DisplayNameConfig,
@@ -59,10 +59,9 @@ pub async fn run_connector(
         });
 
         async {
-            // Start Connector.
             let dn_verifier = DisplayNameVerifier::new(db.clone(), dn_config.clone());
             let conn =
-                Connector::start(config.endpoint, config.network, db.clone(), dn_verifier).await?;
+                Connection::open(config.endpoint, config.network, db.clone(), dn_verifier).await?;
 
             info!("Connection initiated");
             info!("Sending pending judgements request to Watcher");
@@ -76,6 +75,475 @@ pub async fn run_connector(
 
     Ok(())
 }
+
+//------------------------------------------------------------------------------
+
+/// Handles incoming and outgoing websocket messages to and from the Watcher.
+struct Connection {
+    #[allow(clippy::type_complexity)]
+    sink: Option<SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>>,
+    db: Database,
+    dn_verifier: DisplayNameVerifier,
+    endpoint: String,
+    network: ChainName,
+    outgoing: UnboundedSender<ClientCommand>,
+    inserted_states: Arc<RwLock<Vec<JudgementState>>>,
+    // Tracks the last message received from the Watcher. If a certain treshold
+    // was exceeded, the Connector attempts to reconnect.
+    last_watcher_msg: Timestamp,
+}
+
+impl Connection {
+    async fn open(
+        endpoint: String,
+        network: ChainName,
+        db: Database,
+        dn_verifier: DisplayNameVerifier,
+    ) -> Result<Addr<Connection>> {
+        let (_, framed) = Client::new()
+            .ws(&endpoint)
+            .max_frame_size(5_000_000)
+            .connect()
+            .await
+            .map_err(|err| {
+                anyhow!(
+                    "failed to initiate client connector to {}: {:?}",
+                    endpoint,
+                    err
+                )
+            })?;
+
+        // Create throw-away channels (`outgoing` in `Connector` is only used in tests.)
+        let (outgoing, _recv) = mpsc::unbounded_channel();
+
+        // Start the Connector actor with the attached websocket stream.
+        let (sink, stream) = framed.split();
+        let actor = Connection::create(|ctx| {
+            Connection::add_stream(stream, ctx);
+            Connection {
+                sink: Some(SinkWrite::new(sink, ctx)),
+                db,
+                dn_verifier,
+                endpoint,
+                network,
+                outgoing,
+                inserted_states: Default::default(),
+                last_watcher_msg: Timestamp::now(),
+            }
+        });
+
+        Ok(actor)
+    }
+
+    // Request pending judgements every couple of seconds.
+    fn start_pending_judgements_task(&self, ctx: &mut Context<Self>) {
+        info!("Starting pending judgement requester background task");
+
+        ctx.run_interval(
+            Duration::new(PENDING_JUDGEMENTS_INTERVAL, 0),
+            |_act, ctx| {
+                ctx.address()
+                    .do_send(ClientCommand::RequestPendingJudgements)
+            },
+        );
+    }
+
+    // Request actively used display names every couple of seconds.
+    fn start_active_display_names_task(&self, ctx: &mut Context<Self>) {
+        info!("Starting display name requester background task");
+
+        ctx.run_interval(Duration::new(DISPLAY_NAMES_INTERVAL, 0), |_act, ctx| {
+            ctx.address().do_send(ClientCommand::RequestDisplayNames)
+        });
+    }
+
+    // Look for verified identities and submit those to the Watcher.
+    fn start_judgement_candidates_task(&self, ctx: &mut Context<Self>) {
+        info!("Starting judgement candidate submitter background task");
+
+        let db = self.db.clone();
+        let addr = ctx.address();
+        let network = self.network;
+
+        ctx.run_interval(
+            Duration::new(JUDGEMENT_CANDIDATES_INTERVAL, 0),
+            move |_act, _ctx| {
+                let db = db.clone();
+                let addr = addr.clone();
+
+                actix::spawn(async move {
+                    // Provide judgments for the specific network.
+                    match db.fetch_judgement_candidates(network).await {
+                        Ok(completed) => {
+                            for state in completed {
+                                info!("Notifying Watcher about judgement: {:?}", state.context);
+                                addr.do_send(ClientCommand::ProvideJudgement(state));
+                            }
+                        }
+                        Err(err) => {
+                            error!("Failed to fetch judgement candidates: {:?}", err);
+                        }
+                    }
+                });
+            },
+        );
+    }
+}
+
+impl Actor for Connection {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        let span = info_span!("connector_background_tasks");
+
+        span.in_scope(|| {
+            debug!(
+                network = self.network.as_str(),
+                endpoint = self.endpoint.as_str()
+            );
+
+            self.start_pending_judgements_task(ctx);
+            self.start_active_display_names_task(ctx);
+            self.start_judgement_candidates_task(ctx);
+        });
+    }
+
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
+        let span = warn_span!("watcher_connection_drop");
+        span.in_scope(|| {
+            debug!(
+                network = self.network.as_str(),
+                endpoint = self.endpoint.as_str()
+            );
+        });
+
+        let endpoint = self.endpoint.clone();
+        let network = self.network;
+        let db = self.db.clone();
+        let dn_verifier = self.dn_verifier.clone();
+
+        actix::spawn(
+            async move {
+                warn!("Watcher disconnected, trying to reconnect...");
+
+                let mut counter = 0;
+                loop {
+                    if Connection::open(endpoint.clone(), network, db.clone(), dn_verifier.clone())
+                        .await
+                        .is_err()
+                    {
+                        warn!("Reconnection failed, retrying...");
+
+                        counter += 1;
+                        if counter >= 10 {
+                            error!("Cannot reconnect to Watcher after {} attempts", counter);
+                        }
+
+                        sleep(Duration::from_secs(RECONNECTION_TIMEOUT)).await;
+                    } else {
+                        info!("Reconnected to Watcher!");
+                        break;
+                    }
+                }
+            }
+                .instrument(span),
+        );
+    }
+}
+
+impl WriteHandler<WsProtocolError> for Connection {}
+
+// Handle messages that should be sent to the Watcher.
+impl Handler<ClientCommand> for Connection {
+    type Result = crate::Result<()>;
+
+    fn handle(&mut self, msg: ClientCommand, ctx: &mut Context<Self>) -> Self::Result {
+        let span = debug_span!("handling_client_message");
+
+        // NOTE: make sure no async code comes after this.
+        let _guard = span.enter();
+        debug!(
+            network = self.network.as_str(),
+            endpoint = self.endpoint.as_str()
+        );
+
+        // If the sink (outgoing WS stream) is not configured (i.e. when
+        // testing), send the client command to the channel.
+        if self.sink.is_none() {
+            warn!("Skipping message to Watcher, not configured (only occurs when testing)");
+            self.outgoing.send(msg).unwrap();
+            return Ok(());
+        }
+
+        let sink = self.sink.as_mut().unwrap();
+
+        // Do a connection check and reconnect if necessary.
+        if sink.closed() {
+            ctx.stop();
+            return Ok(());
+        }
+
+        // Do a timestamp check and reconnect if necessary.
+        if Timestamp::now().raw() - self.last_watcher_msg.raw() > (HEARTBEAT_INTERVAL * 2) {
+            warn!("Last received message from the Watcher was a while ago, resetting connection");
+            ctx.stop();
+            return Ok(());
+        }
+
+        match msg {
+            ClientCommand::ProvideJudgement(state) => {
+                debug!(
+                    "Providing judgement over websocket stream: {:?}",
+                    state.context
+                );
+                let verified = state.as_verified_entries();
+
+                sink.write(Message::Text(
+                    serde_json::to_string(&ResponseMessage {
+                        event: EventType::JudgementResult,
+                        data: JudgementResponse {
+                            address: state.context.address,
+                            judgement: Judgement::Reasonable,
+                            verified,
+                        },
+                    })
+                        .unwrap()
+                        .into(),
+                ))
+                    .map_err(|err| anyhow!("failed to provide judgement: {:?}", err))?;
+            }
+            ClientCommand::RequestPendingJudgements => {
+                debug!("Requesting pending judgements over websocket stream");
+
+                sink.write(Message::Text(
+                    serde_json::to_string(&ResponseMessage {
+                        event: EventType::PendingJudgementsRequest,
+                        data: (),
+                    })
+                        .unwrap()
+                        .into(),
+                ))
+                    .map_err(|err| anyhow!("failed to request pending judgements: {:?}", err))?;
+            }
+            ClientCommand::RequestDisplayNames => {
+                debug!("Requesting display names over websocket stream");
+
+                sink.write(Message::Text(
+                    serde_json::to_string(&ResponseMessage {
+                        event: EventType::DisplayNamesRequest,
+                        data: (),
+                    })
+                        .unwrap()
+                        .into(),
+                ))
+                    .map_err(|err| anyhow!("failed to request display names: {:?}", err))?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+// Handle messages that were received from the Watcher.
+impl Handler<WatcherMessage> for Connection {
+    type Result = ResponseActFuture<Self, crate::Result<()>>;
+
+    fn handle(&mut self, msg: WatcherMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        /// Handle a judgement request.
+        async fn process_request(
+            db: &Database,
+            id: IdentityContext,
+            mut accounts: HashMap<AccountType, String>,
+            dn_verifier: &DisplayNameVerifier,
+            // Only used in testing.
+            inserted_states: &Arc<RwLock<Vec<JudgementState>>>,
+        ) -> Result<()> {
+            // Decode display name if appropriate.
+            if let Some((_, val)) = accounts
+                .iter_mut()
+                .find(|(ty, _)| *ty == &AccountType::DisplayName)
+            {
+                try_decode_hex(val);
+            }
+
+            // If the fields of the request are the same as the current state, return.
+            if let Some(current_state) = db.fetch_judgement_state(&id).await? {
+                if current_state.has_same_fields_as(&accounts) {
+                    return Ok(());
+                }
+            }
+
+            // Create judgement state and prepare to insert into database.
+            let state = JudgementState::new(id, accounts.into_iter().map(|a| a.into()).collect());
+
+            // Add the judgement state that's about to get inserted into the
+            // local queue which is then fetched from the unit tests.
+            #[cfg(not(test))]
+            let _ = inserted_states;
+            #[cfg(test)]
+            {
+                let mut l = inserted_states.write().await;
+                (*l).push(state.clone());
+            }
+
+            // Insert identity into the database and verify display name if the
+            // database entry was modified (or newly inserted).
+            if db.add_judgement_request(&state).await? {
+                dn_verifier.verify_display_name(&state).await?;
+            }
+
+            Ok(())
+        }
+
+        // Update timestamp
+        self.last_watcher_msg = Timestamp::now();
+
+        let network = self.network;
+        let db = self.db.clone();
+        let dn_verifier = self.dn_verifier.clone();
+        let inserted_states = Arc::clone(&self.inserted_states);
+
+        Box::pin(
+            async move {
+                match msg {
+                    WatcherMessage::Ack(data) => {
+                        if data.result.to_lowercase().contains("judgement given") {
+                            // Create identity context.
+                            let address =
+                                data.address
+                                    .ok_or_else(|| {
+                                        anyhow!(
+                                    "no address specified in 'judgement given' response from Watcher"
+                                )
+                                    })?;
+
+                            let context = IdentityContext::new(address, network);
+
+                            info!("Marking {:?} as judged", context);
+                            db.set_judged(&context).await?;
+                        }
+                    }
+                    WatcherMessage::NewJudgementRequest(data) => {
+                        let id = IdentityContext::new(data.address, network);
+                        process_request(&db, id, data.accounts, &dn_verifier, &inserted_states).await?;
+                    }
+                    WatcherMessage::PendingJudgementsRequests(data) => {
+                        // Convert data.
+                        let data: Vec<(IdentityContext, HashMap<AccountType, String>)> = data
+                            .into_iter()
+                            .map(|req| (
+                                IdentityContext::new(req.address, network),
+                                req.accounts
+                            ))
+                            .collect();
+
+                        for (context, accounts) in data {
+                            process_request(&db, context, accounts, &dn_verifier, &inserted_states).await?;
+                        }
+                    }
+                    WatcherMessage::ActiveDisplayNames(data) => {
+                        for mut name in data {
+                            name.try_decode_hex();
+
+                            let context = IdentityContext::new(name.address, network);
+                            let entry = DisplayNameEntry {
+                                context,
+                                display_name: name.display_name,
+                            };
+
+                            db.insert_display_name(&entry).await?;
+                        }
+                    }
+                }
+
+                Ok(())
+            }.into_actor(self)
+        )
+    }
+}
+
+/// Handle websocket messages received from the Watcher. Those messages will be
+/// forwarded to the `Handler<WatcherMessage>` implementation.
+impl StreamHandler<std::result::Result<Frame, WsProtocolError>> for Connection {
+    fn handle(
+        &mut self,
+        msg: std::result::Result<Frame, WsProtocolError>,
+        ctx: &mut Context<Self>,
+    ) {
+        async fn local(
+            conn: Addr<Connection>,
+            msg: std::result::Result<Frame, WsProtocolError>,
+        ) -> Result<()> {
+            let parsed: ResponseMessage<serde_json::Value> = match msg {
+                Ok(Frame::Text(txt)) => serde_json::from_slice(&txt)?,
+                Ok(other) => {
+                    debug!("Received unexpected message: {:?}", other);
+                    return Ok(());
+                }
+                Err(err) => return Err(anyhow!("error message: {:?}", err)),
+            };
+
+            match parsed.event {
+                EventType::Ack => {
+                    debug!("Received acknowledgement from Watcher: {:?}", parsed.data);
+
+                    let data: AckResponse = serde_json::from_value(parsed.data)?;
+                    conn.send(WatcherMessage::Ack(data)).await??;
+                }
+                EventType::Error => {
+                    error!("Received error from Watcher: {:?}", parsed.data);
+                }
+                EventType::NewJudgementRequest => {
+                    info!(
+                        "Received new judgement request from Watcher: {:?}",
+                        parsed.data
+                    );
+
+                    let data: JudgementRequest = serde_json::from_value(parsed.data)?;
+                    conn.send(WatcherMessage::NewJudgementRequest(data))
+                        .await??;
+                }
+                EventType::PendingJudgementsResponse => {
+                    let data: Vec<JudgementRequest> = serde_json::from_value(parsed.data)?;
+                    debug!("Received {} pending judgments from Watcher", data.len());
+                    conn.send(WatcherMessage::PendingJudgementsRequests(data))
+                        .await??;
+                }
+                EventType::DisplayNamesResponse => {
+                    let data: Vec<DisplayNameEntryRaw> = serde_json::from_value(parsed.data)?;
+                    debug!("Received {} display names from the Watcher", data.len());
+                    conn.send(WatcherMessage::ActiveDisplayNames(data))
+                        .await??;
+                }
+                _ => {
+                    warn!("Received unrecognized message from Watcher: {:?}", parsed);
+                }
+            }
+
+            Ok(())
+        }
+
+        let span = debug_span!("handling_websocket_message");
+        span.in_scope(|| {
+            debug!(
+                network = self.network.as_str(),
+                endpoint = self.endpoint.as_str()
+            );
+
+            let addr = ctx.address();
+            actix::spawn(
+                async move {
+                    if let Err(err) = local(addr, msg).await {
+                        error!("Failed to process message in websocket stream: {:?}", err);
+                    }
+                }
+                    .in_current_span(),
+            );
+        });
+    }
+}
+
+//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ResponseMessage<T> {
@@ -185,471 +653,6 @@ pub enum ClientCommand {
     ProvideJudgement(JudgementState),
     RequestPendingJudgements,
     RequestDisplayNames,
-}
-
-/// Handles incoming and outgoing websocket messages to and from the Watcher.
-struct Connector {
-    #[allow(clippy::type_complexity)]
-    sink: Option<SinkWrite<Message, SplitSink<Framed<BoxedSocket, Codec>, Message>>>,
-    db: Database,
-    dn_verifier: DisplayNameVerifier,
-    endpoint: String,
-    network: ChainName,
-    outgoing: UnboundedSender<ClientCommand>,
-    inserted_states: Arc<RwLock<Vec<JudgementState>>>,
-    // Tracks the last message received from the Watcher. If a certain treshold
-    // was exceeded, the Connector attempts to reconnect.
-    last_watcher_msg: Timestamp,
-}
-
-impl Connector {
-    async fn start(
-        endpoint: String,
-        network: ChainName,
-        db: Database,
-        dn_verifier: DisplayNameVerifier,
-    ) -> Result<Addr<Connector>> {
-        let (_, framed) = Client::new()
-            .ws(&endpoint)
-            .max_frame_size(5_000_000)
-            .connect()
-            .await
-            .map_err(|err| {
-                anyhow!(
-                    "failed to initiate client connector to {}: {:?}",
-                    endpoint,
-                    err
-                )
-            })?;
-
-        // Create throw-away channels (`outgoing` in `Connector` is only used in tests.)
-        let (outgoing, _recv) = mpsc::unbounded_channel();
-
-        // Start the Connector actor with the attached websocket stream.
-        let (sink, stream) = framed.split();
-        let actor = Connector::create(|ctx| {
-            Connector::add_stream(stream, ctx);
-            Connector {
-                sink: Some(SinkWrite::new(sink, ctx)),
-                db,
-                dn_verifier,
-                endpoint,
-                network,
-                outgoing,
-                inserted_states: Default::default(),
-                last_watcher_msg: Timestamp::now(),
-            }
-        });
-
-        Ok(actor)
-    }
-
-    // Request pending judgements every couple of seconds.
-    fn start_pending_judgements_task(&self, ctx: &mut Context<Self>) {
-        info!("Starting pending judgement requester background task");
-
-        ctx.run_interval(
-            Duration::new(PENDING_JUDGEMENTS_INTERVAL, 0),
-            |_act, ctx| {
-                ctx.address()
-                    .do_send(ClientCommand::RequestPendingJudgements)
-            },
-        );
-    }
-
-    // Request actively used display names every couple of seconds.
-    fn start_active_display_names_task(&self, ctx: &mut Context<Self>) {
-        info!("Starting display name requester background task");
-
-        ctx.run_interval(Duration::new(DISPLAY_NAMES_INTERVAL, 0), |_act, ctx| {
-            ctx.address().do_send(ClientCommand::RequestDisplayNames)
-        });
-    }
-
-    // Look for verified identities and submit those to the Watcher.
-    fn start_judgement_candidates_task(&self, ctx: &mut Context<Self>) {
-        info!("Starting judgement candidate submitter background task");
-
-        let db = self.db.clone();
-        let addr = ctx.address();
-        let network = self.network;
-
-        ctx.run_interval(
-            Duration::new(JUDGEMENT_CANDIDATES_INTERVAL, 0),
-            move |_act, _ctx| {
-                let db = db.clone();
-                let addr = addr.clone();
-
-                actix::spawn(async move {
-                    // Provide judgments for the specific network.
-                    match db.fetch_judgement_candidates(network).await {
-                        Ok(completed) => {
-                            for state in completed {
-                                info!("Notifying Watcher about judgement: {:?}", state.context);
-                                addr.do_send(ClientCommand::ProvideJudgement(state));
-                            }
-                        }
-                        Err(err) => {
-                            error!("Failed to fetch judgement candidates: {:?}", err);
-                        }
-                    }
-                });
-            },
-        );
-    }
-}
-
-impl Actor for Connector {
-    type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Context<Self>) {
-        let span = info_span!("connector_background_tasks");
-
-        span.in_scope(|| {
-            debug!(
-                network = self.network.as_str(),
-                endpoint = self.endpoint.as_str()
-            );
-
-            self.start_pending_judgements_task(ctx);
-            self.start_active_display_names_task(ctx);
-            self.start_judgement_candidates_task(ctx);
-        });
-    }
-
-    fn stopped(&mut self, _ctx: &mut Context<Self>) {
-        let span = warn_span!("watcher_connection_drop");
-        span.in_scope(|| {
-            debug!(
-                network = self.network.as_str(),
-                endpoint = self.endpoint.as_str()
-            );
-        });
-
-        let endpoint = self.endpoint.clone();
-        let network = self.network;
-        let db = self.db.clone();
-        let dn_verifier = self.dn_verifier.clone();
-
-        actix::spawn(
-            async move {
-                warn!("Watcher disconnected, trying to reconnect...");
-
-                let mut counter = 0;
-                loop {
-                    if Connector::start(endpoint.clone(), network, db.clone(), dn_verifier.clone())
-                        .await
-                        .is_err()
-                    {
-                        warn!("Reconnection failed, retrying...");
-
-                        counter += 1;
-                        if counter >= 10 {
-                            error!("Cannot reconnect to Watcher after {} attempts", counter);
-                        }
-
-                        sleep(Duration::from_secs(RECONNECTION_TIMEOUT)).await;
-                    } else {
-                        info!("Reconnected to Watcher!");
-                        break;
-                    }
-                }
-            }
-            .instrument(span),
-        );
-    }
-}
-
-impl WriteHandler<WsProtocolError> for Connector {}
-
-// Handle messages that should be sent to the Watcher.
-impl Handler<ClientCommand> for Connector {
-    type Result = crate::Result<()>;
-
-    fn handle(&mut self, msg: ClientCommand, ctx: &mut Context<Self>) -> Self::Result {
-        let span = debug_span!("handling_client_message");
-
-        // NOTE: make sure no async code comes after this.
-        let _guard = span.enter();
-        debug!(
-            network = self.network.as_str(),
-            endpoint = self.endpoint.as_str()
-        );
-
-        // If the sink (outgoing WS stream) is not configured (i.e. when
-        // testing), send the client command to the channel.
-        if self.sink.is_none() {
-            warn!("Skipping message to Watcher, not configured (only occurs when testing)");
-            self.outgoing.send(msg).unwrap();
-            return Ok(());
-        }
-
-        let sink = self.sink.as_mut().unwrap();
-
-        // Do a connection check and reconnect if necessary.
-        if sink.closed() {
-            ctx.stop();
-            return Ok(());
-        }
-
-        // Do a timestamp check and reconnect if necessary.
-        if Timestamp::now().raw() - self.last_watcher_msg.raw() > (HEARTBEAT_INTERVAL * 2) {
-            warn!("Last received message from the Watcher was a while ago, resetting connection");
-            ctx.stop();
-            return Ok(());
-        }
-
-        match msg {
-            ClientCommand::ProvideJudgement(state) => {
-                debug!(
-                    "Providing judgement over websocket stream: {:?}",
-                    state.context
-                );
-                let verified = state.as_verified_entries();
-
-                sink.write(Message::Text(
-                    serde_json::to_string(&ResponseMessage {
-                        event: EventType::JudgementResult,
-                        data: JudgementResponse {
-                            address: state.context.address,
-                            judgement: Judgement::Reasonable,
-                            verified,
-                        },
-                    })
-                    .unwrap()
-                    .into(),
-                ))
-                .map_err(|err| anyhow!("failed to provide judgement: {:?}", err))?;
-            }
-            ClientCommand::RequestPendingJudgements => {
-                debug!("Requesting pending judgements over websocket stream");
-
-                sink.write(Message::Text(
-                    serde_json::to_string(&ResponseMessage {
-                        event: EventType::PendingJudgementsRequest,
-                        data: (),
-                    })
-                    .unwrap()
-                    .into(),
-                ))
-                .map_err(|err| anyhow!("failed to request pending judgements: {:?}", err))?;
-            }
-            ClientCommand::RequestDisplayNames => {
-                debug!("Requesting display names over websocket stream");
-
-                sink.write(Message::Text(
-                    serde_json::to_string(&ResponseMessage {
-                        event: EventType::DisplayNamesRequest,
-                        data: (),
-                    })
-                    .unwrap()
-                    .into(),
-                ))
-                .map_err(|err| anyhow!("failed to request display names: {:?}", err))?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-// Handle messages that were received from the Watcher.
-impl Handler<WatcherMessage> for Connector {
-    type Result = ResponseActFuture<Self, crate::Result<()>>;
-
-    fn handle(&mut self, msg: WatcherMessage, _ctx: &mut Context<Self>) -> Self::Result {
-        /// Handle a judgement request.
-        async fn process_request(
-            db: &Database,
-            id: IdentityContext,
-            mut accounts: HashMap<AccountType, String>,
-            dn_verifier: &DisplayNameVerifier,
-            // Only used in testing.
-            inserted_states: &Arc<RwLock<Vec<JudgementState>>>,
-        ) -> Result<()> {
-            // Decode display name if appropriate.
-            if let Some((_, val)) = accounts
-                .iter_mut()
-                .find(|(ty, _)| *ty == &AccountType::DisplayName)
-            {
-                try_decode_hex(val);
-            }
-
-            // If the fields of the request are the same as the current state, return.
-            if let Some(current_state) = db.fetch_judgement_state(&id).await? {
-                if current_state.has_same_fields_as(&accounts) {
-                    return Ok(());
-                }
-            }
-
-            // Create judgement state and prepare to insert into database.
-            let state = JudgementState::new(id, accounts.into_iter().map(|a| a.into()).collect());
-
-            // Add the judgement state that's about to get inserted into the
-            // local queue which is then fetched from the unit tests.
-            #[cfg(not(test))]
-            let _ = inserted_states;
-            #[cfg(test)]
-            {
-                let mut l = inserted_states.write().await;
-                (*l).push(state.clone());
-            }
-
-            // Insert identity into the database and verify display name if the
-            // database entry was modified (or newly inserted).
-            if db.add_judgement_request(&state).await? {
-                dn_verifier.verify_display_name(&state).await?;
-            }
-
-            Ok(())
-        }
-
-        // Update timestamp
-        self.last_watcher_msg = Timestamp::now();
-
-        let network = self.network;
-        let db = self.db.clone();
-        let dn_verifier = self.dn_verifier.clone();
-        let inserted_states = Arc::clone(&self.inserted_states);
-
-        Box::pin(
-            async move {
-                match msg {
-                    WatcherMessage::Ack(data) => {
-                        if data.result.to_lowercase().contains("judgement given") {
-                            // Create identity context.
-                            let address =
-                                data.address
-                                .ok_or_else(|| {
-                                anyhow!(
-                                    "no address specified in 'judgement given' response from Watcher"
-                                )
-                            })?;
-
-                            let context = IdentityContext::new(address, network);
-
-                            info!("Marking {:?} as judged", context);
-                            db.set_judged(&context).await?;
-                        }
-                    }
-                    WatcherMessage::NewJudgementRequest(data) => {
-                        let id = IdentityContext::new(data.address, network);
-                        process_request(&db, id, data.accounts, &dn_verifier, &inserted_states).await?;
-                    }
-                    WatcherMessage::PendingJudgementsRequests(data) => {
-                        // Convert data.
-                        let data: Vec<(IdentityContext, HashMap<AccountType, String>)> = data
-                            .into_iter()
-                            .map(|req| (
-                                IdentityContext::new(req.address, network),
-                                req.accounts
-                            ))
-                            .collect();
-
-                        for (context, accounts) in data {
-                            process_request(&db, context, accounts, &dn_verifier, &inserted_states).await?;
-                        }
-                    }
-                    WatcherMessage::ActiveDisplayNames(data) => {
-                        for mut name in data {
-                            name.try_decode_hex();
-
-                            let context = IdentityContext::new(name.address, network);
-                            let entry = DisplayNameEntry {
-                                context,
-                                display_name: name.display_name,
-                            };
-
-                            db.insert_display_name(&entry).await?;
-                        }
-                    }
-                }
-
-                Ok(())
-            }.into_actor(self)
-        )
-    }
-}
-
-/// Handle websocket messages received from the Watcher. Those messages will be
-/// forwarded to the `Handler<WatcherMessage>` implementation.
-impl StreamHandler<std::result::Result<Frame, WsProtocolError>> for Connector {
-    fn handle(
-        &mut self,
-        msg: std::result::Result<Frame, WsProtocolError>,
-        ctx: &mut Context<Self>,
-    ) {
-        async fn local(
-            conn: Addr<Connector>,
-            msg: std::result::Result<Frame, WsProtocolError>,
-        ) -> Result<()> {
-            let parsed: ResponseMessage<serde_json::Value> = match msg {
-                Ok(Frame::Text(txt)) => serde_json::from_slice(&txt)?,
-                Ok(other) => {
-                    debug!("Received unexpected message: {:?}", other);
-                    return Ok(());
-                }
-                Err(err) => return Err(anyhow!("error message: {:?}", err)),
-            };
-
-            match parsed.event {
-                EventType::Ack => {
-                    debug!("Received acknowledgement from Watcher: {:?}", parsed.data);
-
-                    let data: AckResponse = serde_json::from_value(parsed.data)?;
-                    conn.send(WatcherMessage::Ack(data)).await??;
-                }
-                EventType::Error => {
-                    error!("Received error from Watcher: {:?}", parsed.data);
-                }
-                EventType::NewJudgementRequest => {
-                    info!(
-                        "Received new judgement request from Watcher: {:?}",
-                        parsed.data
-                    );
-
-                    let data: JudgementRequest = serde_json::from_value(parsed.data)?;
-                    conn.send(WatcherMessage::NewJudgementRequest(data))
-                        .await??;
-                }
-                EventType::PendingJudgementsResponse => {
-                    let data: Vec<JudgementRequest> = serde_json::from_value(parsed.data)?;
-                    debug!("Received {} pending judgments from Watcher", data.len());
-                    conn.send(WatcherMessage::PendingJudgementsRequests(data))
-                        .await??;
-                }
-                EventType::DisplayNamesResponse => {
-                    let data: Vec<DisplayNameEntryRaw> = serde_json::from_value(parsed.data)?;
-                    debug!("Received {} display names from the Watcher", data.len());
-                    conn.send(WatcherMessage::ActiveDisplayNames(data))
-                        .await??;
-                }
-                _ => {
-                    warn!("Received unrecognized message from Watcher: {:?}", parsed);
-                }
-            }
-
-            Ok(())
-        }
-
-        let span = debug_span!("handling_websocket_message");
-        span.in_scope(|| {
-            debug!(
-                network = self.network.as_str(),
-                endpoint = self.endpoint.as_str()
-            );
-
-            let addr = ctx.address();
-            actix::spawn(
-                async move {
-                    if let Err(err) = local(addr, msg).await {
-                        error!("Failed to process message in websocket stream: {:?}", err);
-                    }
-                }
-                .in_current_span(),
-            );
-        });
-    }
 }
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug, Serialize, Deserialize)]

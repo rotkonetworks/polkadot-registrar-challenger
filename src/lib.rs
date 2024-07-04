@@ -18,7 +18,7 @@ use watcher::ChainName;
 use std::fs;
 use std::time::Duration;
 
-use watcher::run_connector;
+use watcher::open_connections;
 use database::Database;
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
@@ -127,7 +127,7 @@ async fn config_listener(db: Database, config: ListenerConfig) -> Result<()> {
     }
     let watchers = config.watchers.clone();
     let dn_config = config.display_name.clone();
-    run_connector(db, watchers, dn_config).await
+    open_connections(db, watchers, dn_config).await
 }
 
 pub async fn run() -> Result<()> {
