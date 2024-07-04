@@ -1,7 +1,9 @@
 use crate::blockchain::{AccountType, DisplayNameEntry, VerifiedEntry};
+
 use actix::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct IdentityContext {
@@ -593,7 +595,7 @@ impl std::fmt::Display for RawFieldName {
 impl FromStr for RawFieldName {
     type Err = Response;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<RawFieldName, Response> {
         // Convenience handler.
         let s = s.trim().replace('-', "").replace('_', "").to_lowercase();
 
@@ -611,8 +613,6 @@ impl FromStr for RawFieldName {
         Ok(f)
     }
 }
-
-pub type Result<T> = std::result::Result<T, Response>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Response {

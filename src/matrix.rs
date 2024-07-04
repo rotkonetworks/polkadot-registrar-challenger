@@ -1,5 +1,5 @@
 use crate::base::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
-use crate::{base, Database, Result};
+use crate::{Database, Result};
 use matrix_sdk::events::room::member::MemberEventContent;
 use matrix_sdk::events::room::message::{MessageEventContent, MessageType, TextMessageEventContent};
 use matrix_sdk::events::{AnyMessageEventContent, StrippedStateEvent, SyncMessageEvent};
@@ -255,7 +255,7 @@ enum Command {
 impl FromStr for Command {
     type Err = Response;
 
-    fn from_str(s: &str) -> base::Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Command, Response> {
         // Convenience handler.
         let s = s.trim().replace("  ", " ");
 
@@ -277,7 +277,7 @@ impl FromStr for Command {
                 parts[1..]
                     .iter()
                     .map(|s| RawFieldName::from_str(s))
-                    .collect::<base::Result<Vec<RawFieldName>>>()?,
+                    .collect::<std::result::Result<Vec<RawFieldName>, Response>>()?,
             ))
         } else if s.starts_with("help") {
             let count = s.split(' ').count();
