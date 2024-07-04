@@ -12,14 +12,13 @@ mod watcher;
 mod database;
 mod display_name;
 
+use database::Database;
+use watcher::ChainName;
+
 use actix::clock::sleep;
 use matrix::Nickname;
-use watcher::ChainName;
 use std::fs;
 use std::time::Duration;
-
-use watcher::open_connections;
-use database::Database;
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
 
@@ -33,7 +32,7 @@ struct Config {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LogLevel {
+enum LogLevel {
     Error,
     Warn,
     Info,
@@ -62,21 +61,21 @@ struct DatabaseConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct ListenerConfig {
+struct ListenerConfig {
     pub watchers: Vec<WatcherConfig>,
     pub matrix: MatrixConfig,
     pub display_name: DisplayNameConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct WatcherConfig {
+struct WatcherConfig {
     pub network: ChainName,
     pub endpoint: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct MatrixConfig {
+struct MatrixConfig {
     pub enabled: bool,
     pub homeserver: String,
     pub username: String,
@@ -86,48 +85,21 @@ pub struct MatrixConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct NotifierConfig {
-    pub api_address: String,
-    pub cors_allow_origin: Vec<String>,
-    pub display_name: DisplayNameConfig,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DisplayNameConfig {
+struct DisplayNameConfig {
     pub enabled: bool,
     pub limit: f64,
 }
 
 fn open_config() -> Result<Config> {
-    // Open config file.
     let content = fs::read_to_string("config.yaml")
         .map_err(|_| {
             anyhow!("Failed to open config at 'config.yaml'.")
         })?;
 
-    // Parse config file as JSON.
     let config = serde_yaml::from_str::<Config>(&content)
         .map_err(|err| anyhow!("Failed to parse config: {:?}", err))?;
 
     Ok(config)
-}
-
-async fn config_listener(db: Database, config: ListenerConfig) -> Result<()> {
-    if config.matrix.enabled {
-        let config = config.matrix;
-        matrix::start_listener(
-            db.clone(),
-            &config.homeserver,
-            &config.username,
-            &config.password,
-            &config.db_path,
-            config.admins.unwrap_or_default(),
-        ).await?;   
-    }
-    let watchers = config.watchers.clone();
-    let dn_config = config.display_name.clone();
-    open_connections(db, watchers, dn_config).await
 }
 
 pub async fn run() -> Result<()> {
@@ -144,9 +116,24 @@ pub async fn run() -> Result<()> {
     let db = Database::new(&db_config.uri, &db_config.name).await?;
     db.connectivity_check().await?;
 
-    if let Some(adapter_config) = config.listener {
+    if let Some(config) = config.listener {
         info!("Starting listener");
-        config_listener(db.clone(), adapter_config).await?;
+
+        if config.matrix.enabled {
+            let config = config.matrix;
+            matrix::start_listener(
+                db.clone(),
+                &config.homeserver,
+                &config.username,
+                &config.password,
+                &config.db_path,
+                config.admins.unwrap_or_default(),
+            ).await?;
+        }
+
+        let watchers = config.watchers.clone();
+        let dn_config = config.display_name.clone();
+        watcher::open_connections(db, watchers, dn_config).await?;
     }
 
     info!("Setup completed");
