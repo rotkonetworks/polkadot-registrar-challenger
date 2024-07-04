@@ -8,7 +8,6 @@ extern crate serde;
 extern crate async_trait;
 
 pub mod matrix;
-pub mod admin;
 mod api;
 mod connector;
 mod database;
