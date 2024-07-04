@@ -8,7 +8,6 @@ use mongodb::options::{IndexOptions, TransactionOptions, UpdateOptions};
 use rand::{Rng, thread_rng};
 use serde::Serialize;
 
-use crate::api::VerifyChallenge;
 use crate::base::{ChainName, ChallengeType, Event, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
 use crate::connector::DisplayNameEntry;
 use crate::Result;
@@ -540,101 +539,6 @@ impl Database {
         }
 
         Ok(())
-    }
-
-    pub async fn verify_second_challenge(&self, mut request: VerifyChallenge) -> Result<bool> {
-        let mut session = self.start_transaction().await?;
-        let coll = self.db.collection::<JudgementState>(IDENTITY_COLLECTION);
-
-        let mut verified = false;
-
-        // Trim received challenge, just in case.
-        request.challenge = request.challenge.trim().to_string();
-
-        // Query database.
-        let mut cursor = coll
-            .find_with_session(
-                doc! {
-                    "fields.value": request.entry.to_bson()?,
-                },
-                None,
-                &mut session,
-            )
-            .await?;
-
-        while let Some(state) = cursor.next(&mut session).await {
-            let mut state = state?;
-            let field_state = state
-                .fields
-                .iter_mut()
-                .find(|field| field.value == request.entry)
-                .unwrap();
-
-            let context = state.context.clone();
-            let field_value = field_state.value.clone();
-
-            match &mut field_state.challenge {
-                ChallengeType::ExpectedMessage {
-                    expected: _,
-                    second,
-                } => {
-                    // This should never happens, but the provided field value
-                    // depends on user input, so...
-                    if second.is_none() {
-                        continue;
-                    }
-
-                    let second = second.as_mut().unwrap();
-                    if request.challenge.contains(&second.value) {
-                        verified = true;
-
-                        coll.update_one_with_session(
-                            doc! {
-                                "fields.value": request.entry.to_bson()?,
-                                "fields.challenge.content.second.value": request.challenge.to_bson()?,
-                            },
-                            doc! {
-                                "$set": {
-                                    "fields.$.challenge.content.second.is_verified": true.to_bson()?,
-                                }
-                            },
-                            None,
-                            &mut session
-                        )
-                        .await?;
-
-                        self.insert_event(
-                            NotificationMessage::SecondFieldVerified {
-                                context: context.clone(),
-                                field: field_value.clone(),
-                            },
-                            &mut session,
-                        )
-                        .await?;
-                    } else {
-                        self.insert_event(
-                            NotificationMessage::SecondFieldVerificationFailed {
-                                context: context.clone(),
-                                field: field_value.clone(),
-                            },
-                            &mut session,
-                        )
-                        .await?;
-                    }
-                }
-                _ => {
-                    panic!("Invalid challenge type when verifying message");
-                }
-            }
-
-            // Check if the identity is fully verified.
-            self.process_fully_verified(&state.context, &mut session)
-                .await?;
-        }
-
-        session.commit_transaction().await?;
-
-        Ok(verified)
     }
 
     pub async fn fetch_events(
