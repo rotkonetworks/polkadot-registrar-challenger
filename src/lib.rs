@@ -8,19 +8,11 @@ extern crate serde;
 extern crate async_trait;
 
 use actix::clock::sleep;
-use listener::matrix::MatrixHandle;
+use matrix::MatrixHandle;
 use base::ChainName;
 use std::fs;
 use std::time::Duration;
 
-pub type Result<T> = std::result::Result<T, anyhow::Error>;
-
-use api::run_rest_api_server;
-use connector::run_connector;
-use database::Database;
-use notifier::run_session_notifier;
-
-mod listener;
 mod api;
 mod connector;
 mod database;
@@ -29,6 +21,15 @@ mod notifier;
 mod base;
 #[cfg(test)]
 mod tests;
+pub mod matrix;
+pub mod admin;
+
+use api::run_rest_api_server;
+use connector::run_connector;
+use database::Database;
+use notifier::run_session_notifier;
+
+pub type Result<T> = std::result::Result<T, anyhow::Error>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -123,8 +124,15 @@ fn open_config() -> Result<Config> {
 
 async fn config_listener(db: Database, config: ListenerConfig) -> Result<()> {
     if config.matrix.enabled {
-        listener::run_matrix_adapter(config.matrix, db.clone()).await?;
-
+        let config = config.matrix;
+        matrix::start_listener(
+            db.clone(),
+            &config.homeserver,
+            &config.username,
+            &config.password,
+            &config.db_path,
+            config.admins.unwrap_or_default(),
+        ).await?;   
     }
     let watchers = config.watchers.clone();
     let dn_config = config.display_name.clone();
