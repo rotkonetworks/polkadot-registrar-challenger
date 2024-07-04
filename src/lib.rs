@@ -7,22 +7,20 @@ extern crate serde;
 #[macro_use]
 extern crate async_trait;
 
-use actix::clock::sleep;
-use matrix::MatrixHandle;
-use base::ChainName;
-use std::fs;
-use std::time::Duration;
-
+pub mod matrix;
+pub mod admin;
 mod api;
 mod connector;
 mod database;
 mod display_name;
 mod notifier;
 mod base;
-#[cfg(test)]
-mod tests;
-pub mod matrix;
-pub mod admin;
+
+use actix::clock::sleep;
+use matrix::MatrixHandle;
+use base::ChainName;
+use std::fs;
+use std::time::Duration;
 
 use api::run_rest_api_server;
 use connector::run_connector;
