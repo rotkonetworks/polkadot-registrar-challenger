@@ -13,7 +13,7 @@ const REJOIN_DELAY: u64 = 10;
 const REJOIN_MAX_ATTEMPTS: usize = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct MatrixHandle(String);
+pub struct Nickname(String);
 
 pub async fn start_listener(
     db: Database,
@@ -21,7 +21,7 @@ pub async fn start_listener(
     username: &str,
     password: &str,
     db_path: &str,
-    admins: Vec<MatrixHandle>,
+    admins: Vec<Nickname>,
 ) -> Result<()> {
     info!("Setting up client");
     let client_config = ClientConfig::new().store_path(db_path);
@@ -61,14 +61,14 @@ pub async fn start_listener(
 struct Listener {
     client: Client,
     db: Database,
-    admins: Vec<MatrixHandle>,
+    admins: Vec<Nickname>,
 }
 
 impl Listener {
     fn new(
         client: Client,
         db: Database,
-        admins: Vec<MatrixHandle>,
+        admins: Vec<Nickname>,
     ) -> Self {
         Self { client, db, admins }
     }
@@ -97,7 +97,7 @@ impl EventHandler for Listener {
 
             // Check for admin message
             let sender = event.sender.to_string();
-            if self.admins.contains(&MatrixHandle(sender)) {
+            if self.admins.contains(&Nickname(sender)) {
                 let resp = match Command::from_str(msg_body) {
                     // If a valid admin command was found, execute it.
                     Ok(cmd) => Some(process_admin(&self.db, cmd).await),

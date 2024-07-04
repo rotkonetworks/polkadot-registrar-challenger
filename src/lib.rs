@@ -16,7 +16,7 @@ mod notifier;
 mod base;
 
 use actix::clock::sleep;
-use matrix::MatrixHandle;
+use matrix::Nickname;
 use base::ChainName;
 use std::fs;
 use std::time::Duration;
@@ -88,7 +88,7 @@ pub struct MatrixConfig {
     pub username: String,
     pub password: String,
     pub db_path: String,
-    pub admins: Option<Vec<MatrixHandle>>,
+    pub admins: Option<Vec<Nickname>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
