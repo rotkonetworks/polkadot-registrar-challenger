@@ -211,8 +211,4 @@ impl Adapter for MatrixClient {
         // Return messages and wipe inner field.
         Ok(std::mem::take(&mut *lock))
     }
-
-    async fn send_message(&mut self, _to: &str, _content: Self::MessageType) -> Result<()> {
-        unimplemented!()
-    }
 }

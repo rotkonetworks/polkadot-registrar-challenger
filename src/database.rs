@@ -1,15 +1,17 @@
-use crate::api::VerifyChallenge;
-use crate::connector::DisplayNameEntry;
-use crate::base::{ChainName, ChallengeType, Event, ExpectedMessage, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
-use crate::Result;
-use bson::{doc, from_document, to_bson, to_document, Bson, Document};
-use futures::StreamExt;
-use mongodb::options::{IndexOptions, TransactionOptions, UpdateOptions};
-use mongodb::{Client, ClientSession, Database as MongoDb, IndexModel};
-use rand::{thread_rng, Rng};
-use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Duration;
+
+use bson::{Bson, doc, Document, from_document, to_bson, to_document};
+use futures::StreamExt;
+use mongodb::{Client, ClientSession, Database as MongoDb, IndexModel};
+use mongodb::options::{IndexOptions, TransactionOptions, UpdateOptions};
+use rand::{Rng, thread_rng};
+use serde::Serialize;
+
+use crate::api::VerifyChallenge;
+use crate::base::{ChainName, ChallengeType, Event, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
+use crate::connector::DisplayNameEntry;
+use crate::Result;
 
 const IDENTITY_COLLECTION: &str = "identities";
 const EVENT_COLLECTION: &str = "event_log";
@@ -633,51 +635,6 @@ impl Database {
         session.commit_transaction().await?;
 
         Ok(verified)
-    }
-
-    pub async fn fetch_second_challenge(
-        &self,
-        context: &IdentityContext,
-        field: &IdentityFieldValue,
-    ) -> Result<ExpectedMessage> {
-        let coll = self.db.collection::<JudgementState>(IDENTITY_COLLECTION);
-
-        // Query database.
-        let try_state = coll
-            .find_one(
-                doc! {
-                    "context": context.to_bson()?,
-                    "fields.value": field.to_bson()?,
-                },
-                None,
-            )
-            .await?;
-
-        if let Some(state) = try_state {
-            // Optimize this. Should be handled by the query itself.
-            let field_state = state
-                .fields
-                .iter()
-                .find(|f| &f.value == field)
-                // Technically, this should never return an error...
-                .ok_or_else(|| anyhow!("Failed to select field when verifying message"))?;
-
-            match &field_state.challenge {
-                ChallengeType::ExpectedMessage {
-                    expected: _,
-                    second,
-                } => {
-                    if let Some(second) = second {
-                        Ok(second.clone())
-                    } else {
-                        Err(anyhow!("No second challenge found for {:?}", field))
-                    }
-                }
-                _ => Err(anyhow!("No second challenge found for {:?}", field)),
-            }
-        } else {
-            Err(anyhow!("No entry found for {:?}", field))
-        }
     }
 
     pub async fn fetch_events(
