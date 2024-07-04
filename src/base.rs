@@ -1,4 +1,4 @@
-use crate::connector::{AccountType, DisplayNameEntry, VerifiedEntry};
+use crate::blockchain::{AccountType, DisplayNameEntry, VerifiedEntry};
 use actix::Message;
 use std::collections::HashMap;
 use std::str::FromStr;

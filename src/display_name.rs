@@ -1,4 +1,4 @@
-use crate::connector::DisplayNameEntry;
+use crate::blockchain::DisplayNameEntry;
 use crate::database::Database;
 use crate::base::{ChainName, IdentityContext, JudgementState};
 use crate::{DisplayNameConfig, Result};

@@ -9,7 +9,7 @@ use rand::{Rng, thread_rng};
 use serde::Serialize;
 
 use crate::base::{ChainName, ChallengeType, Event, ExternalMessage, IdentityContext, IdentityFieldValue, JudgementState, NotificationMessage, RawFieldName, Timestamp};
-use crate::connector::DisplayNameEntry;
+use crate::blockchain::DisplayNameEntry;
 use crate::Result;
 
 const IDENTITY_COLLECTION: &str = "identities";

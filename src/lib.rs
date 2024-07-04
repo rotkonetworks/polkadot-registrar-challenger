@@ -8,7 +8,7 @@ extern crate serde;
 extern crate async_trait;
 
 pub mod matrix;
-mod connector;
+mod blockchain;
 mod database;
 mod display_name;
 mod base;
@@ -19,7 +19,7 @@ use base::ChainName;
 use std::fs;
 use std::time::Duration;
 
-use connector::run_connector;
+use blockchain::run_connector;
 use database::Database;
 
 pub type Result<T> = std::result::Result<T, anyhow::Error>;
