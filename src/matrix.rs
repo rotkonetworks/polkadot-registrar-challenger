@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::{Database, Result};
-use crate::watcher::{ChainAddress, ChainName, IdentityContext, RawFieldName, Response};
+use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
 use matrix_sdk::room::Room;
 use matrix_sdk::{Client};
@@ -77,7 +77,25 @@ async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<B
             .send(RoomMessageEventContent::text_plain(res.to_string()))
             .await
             .unwrap();
-   }
+   } else {
+        info!("Verifying message {:?}", text.body);
+
+        let msg = ExternalMessage {
+            origin: ExternalMessageType::Matrix(e.sender.to_string()),
+            // A message UID is not relevant regarding a live
+            // message listener. The Matrix SDK handles
+            // synchronization.
+            id: 0u32.into(),
+            timestamp: Timestamp::now(),
+            values: vec![text.body.into()],
+        };
+        match ctx.db.verify_message(&msg).await {
+            Err(e) => {
+                info!("Message verification failed: {:}", e);
+            }
+            _ => {}
+        }
+    }
 }
 
 async fn execute_command<'a>(db: &'a Database, command: Command) -> Response {
