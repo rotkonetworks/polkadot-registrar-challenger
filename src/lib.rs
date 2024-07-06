@@ -4,7 +4,6 @@ extern crate tracing;
 extern crate anyhow;
 #[macro_use]
 extern crate serde;
-#[macro_use]
 extern crate async_trait;
 
 mod matrix;
@@ -120,9 +119,9 @@ pub async fn run() -> Result<()> {
 
         if config.matrix.enabled {
             let config = config.matrix;
-            matrix::start_listener(
+            matrix::start_bot(
                 db.clone(),
-                matrix::ListenerConfig {
+                matrix::BotConfig {
                     homeserver: &config.homeserver,
                     username: &config.username,
                     password: &config.password,
