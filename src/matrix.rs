@@ -5,10 +5,11 @@ use crate::watcher::{ChainAddress, ChainName, IdentityContext, RawFieldName, Res
 
 use matrix_sdk::room::Room;
 use matrix_sdk::{Client};
-use matrix_sdk::ruma::events::room::message::SyncRoomMessageEvent;
+use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent};
+use matrix_sdk::config::SyncSettings;
 
 use std::str::FromStr;
-use matrix_sdk::config::SyncSettings;
+use matrix_sdk::event_handler::Ctx;
 use url::Url;
 
 const REJOIN_DELAY: u64 = 10;
@@ -25,7 +26,12 @@ pub struct BotConfig<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Nickname(String);
 
-pub async fn start_bot<'a>(_: Database, cfg: BotConfig<'a>) -> Result<()> {
+#[derive(Debug, Clone)]
+struct BotContext {
+    db: Database,
+}
+
+pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     let client = Client::new(Url::parse(cfg.homeserver)?).await?;
 
     info!("Logging in as {}", cfg.username);
@@ -45,6 +51,7 @@ pub async fn start_bot<'a>(_: Database, cfg: BotConfig<'a>) -> Result<()> {
     // We do this after the initial sync to avoid responding to messages before
     // the bot was running.
     client.add_event_handler(on_room_message);
+    client.add_event_handler_context(BotContext { db });
 
     // Since we called `sync_once` before we entered our sync loop we must pass
     // that sync token to `sync`.
@@ -55,16 +62,29 @@ pub async fn start_bot<'a>(_: Database, cfg: BotConfig<'a>) -> Result<()> {
     Ok(())
 }
 
-async fn on_room_message(e: SyncRoomMessageEvent, _: Room) {
-    info!("Received event {:#?}", e);
+async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<BotContext>) {
+    info!("Received {:#?}", e);
+
+    let MessageType::Text(text) = e.content.msgtype else {
+        return;
+    };
+
+    if let Ok(cmd) = Command::from_str(&text.body) {
+        info!("Executing command {:#?}", cmd);
+
+        let res = execute_command(&ctx.db, cmd).await;
+        room
+            .send(RoomMessageEventContent::text_plain(res.to_string()))
+            .await
+            .unwrap();
+   }
 }
 
-#[allow(clippy::needless_lifetimes)]
-async fn process_admin<'a>(db: &'a Database, command: Command) -> Response {
+async fn execute_command<'a>(db: &'a Database, command: Command) -> Response {
     let local = |db: &'a Database, command: Command| async move {
         match command {
             Command::Status(addr) => {
-                let context = create_context(addr);
+                let context = create_identity_context(addr);
                 let state = db.fetch_judgement_state(&context).await?;
 
                 // Determine response based on database lookup.
@@ -74,15 +94,14 @@ async fn process_admin<'a>(db: &'a Database, command: Command) -> Response {
                 }
             }
             Command::Verify(addr, fields) => {
-                let context = create_context(addr.clone());
+                let context = create_identity_context(addr.clone());
 
                 // Check if _all_ should be verified (respectively the full identity)
-                #[allow(clippy::collapsible_if)]
                 if fields.iter().any(|f| matches!(f, RawFieldName::All)) {
-                    if db.full_manual_verification(&context).await? {
-                        return Ok(Response::FullyVerified(addr));
+                    return if db.full_manual_verification(&context).await? {
+                        Ok(Response::FullyVerified(addr))
                     } else {
-                        return Ok(Response::IdentityNotFound);
+                        Ok(Response::IdentityNotFound)
                     }
                 }
 
@@ -116,13 +135,12 @@ async fn process_admin<'a>(db: &'a Database, command: Command) -> Response {
 
 /// Convenience function for creating a full identity context when only the
 /// address itself is present. Only supports Kusama and Polkadot for now.
-fn create_context(address: ChainAddress) -> IdentityContext {
+fn create_identity_context(address: ChainAddress) -> IdentityContext {
     let chain = if address.as_str().starts_with('1') {
         ChainName::Polkadot
     } else {
         ChainName::Kusama
     };
-
     IdentityContext { address, chain }
 }
 
@@ -136,23 +154,23 @@ enum Command {
 }
 
 impl FromStr for Command {
-    type Err = Response;
+    type Err = &'static str;
 
-    fn from_str(s: &str) -> std::result::Result<Command, Response> {
-        // Convenience handler.
+    // TODO: Refactor parsing.
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let s = s.trim().replace("  ", " ");
 
         if s.starts_with("status") {
             let parts: Vec<&str> = s.split(' ').skip(1).collect();
             if parts.len() != 1 {
-                return Err(Response::UnknownCommand);
+                return Err("Invalid `status` command");
             }
 
             Ok(Command::Status(ChainAddress::from(parts[0].to_string())))
         } else if s.starts_with("verify") {
             let parts: Vec<&str> = s.split(' ').skip(1).collect();
             if parts.len() < 2 {
-                return Err(Response::UnknownCommand);
+                return Err("Invalid `verify` command");
             }
 
             Ok(Command::Verify(
@@ -160,19 +178,18 @@ impl FromStr for Command {
                 parts[1..]
                     .iter()
                     .map(|s| RawFieldName::from_str(s))
-                    .collect::<std::result::Result<Vec<RawFieldName>, Response>>()?,
+                    .collect::<std::result::Result<Vec<RawFieldName>, &'static str>>()?,
             ))
         } else if s.starts_with("help") {
             let count = s.split(' ').count();
 
             if count > 1 {
-                return Err(Response::UnknownCommand);
+                return Err("Invalid `help` command");
             }
 
             Ok(Command::Help)
         } else {
-            Err(Response::UnknownCommand)
+            Err("Unknown command")
         }
     }
 }
-

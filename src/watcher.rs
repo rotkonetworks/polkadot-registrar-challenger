@@ -1284,9 +1284,9 @@ impl std::fmt::Display for RawFieldName {
 }
 
 impl FromStr for RawFieldName {
-    type Err = Response;
+    type Err = &'static str;
 
-    fn from_str(s: &str) -> std::result::Result<RawFieldName, Response> {
+    fn from_str(s: &str) -> std::result::Result<RawFieldName, Self::Err> {
         // Convenience handler.
         let s = s.trim().replace('-', "").replace('_', "").to_lowercase();
 
@@ -1298,7 +1298,7 @@ impl FromStr for RawFieldName {
             "twitter" => RawFieldName::Twitter,
             "matrix" => RawFieldName::Matrix,
             "all" => RawFieldName::All,
-            _ => return Err(Response::InvalidSyntax(Some(s.to_string()))),
+            _ => return Err("Unknown field"),
         };
 
         Ok(f)
