@@ -60,11 +60,11 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
 }
 
 async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<BotContext>) {
-    info!("Received {:#?}", e);
-
     let MessageType::Text(text) = e.content.msgtype else {
         return;
     };
+
+    info!("Received message from {}:\n\t\n\t{}\n", e.sender, text.body);
 
     if let Ok(cmd) = Command::from_str(&text.body) {
         info!("Executing command {:#?}", cmd);
@@ -75,7 +75,7 @@ async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<B
             .await
             .unwrap();
    } else {
-        info!("Verifying message {:?}", text.body);
+        info!("Verifying message");
 
         let msg = ExternalMessage {
             origin: ExternalMessageType::Matrix(e.sender.to_string()),
