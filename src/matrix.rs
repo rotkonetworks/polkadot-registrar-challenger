@@ -5,7 +5,7 @@ use matrix_sdk::events::room::member::MemberEventContent;
 use matrix_sdk::events::room::message::{MessageEventContent, MessageType, TextMessageEventContent};
 use matrix_sdk::events::{AnyMessageEventContent, StrippedStateEvent, SyncMessageEvent};
 use matrix_sdk::room::Room;
-use matrix_sdk::{Client, ClientConfig, EventHandler, SyncSettings};
+use matrix_sdk::{Client, EventHandler, SyncSettings};
 use std::str::FromStr;
 use tokio::time::{self, Duration};
 use url::Url;
@@ -18,7 +18,6 @@ pub struct ListenerConfig<'a> {
     pub homeserver: &'a str,
     pub username: &'a str,
     pub password: &'a str,
-    pub db_path: &'a str,
     pub admins: Vec<Nickname>,
 }
 
@@ -27,9 +26,7 @@ pub struct Nickname(String);
 
 pub async fn start_listener<'a>(db: Database, cfg: ListenerConfig<'a>) -> Result<()> {
     info!("Setting up client");
-    let client_config = ClientConfig::new().store_path(cfg.db_path);
-    let homeserver = Url::parse(cfg.homeserver)?;
-    let client = Client::new_with_config(homeserver, client_config)?;
+    let client = Client::new(Url::parse(cfg.homeserver)?)?;
 
     info!("Login with credentials");
     client

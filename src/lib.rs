@@ -80,7 +80,6 @@ struct MatrixConfig {
     pub homeserver: String,
     pub username: String,
     pub password: String,
-    pub db_path: String,
     pub admins: Option<Vec<Nickname>>,
 }
 
@@ -127,7 +126,6 @@ pub async fn run() -> Result<()> {
                     homeserver: &config.homeserver,
                     username: &config.username,
                     password: &config.password,
-                    db_path: &config.db_path,
                     admins: config.admins.unwrap_or_default(),
                 }
             ).await?;

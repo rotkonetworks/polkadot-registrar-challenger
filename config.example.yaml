@@ -13,7 +13,6 @@ listener:
     homeserver: homeserver
     username: username
     password: password
-    db_path: db_path
     admins: null
   display_name:
     enabled: true
