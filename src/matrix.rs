@@ -11,7 +11,6 @@ use matrix_sdk::{
 };
 
 use std::str::FromStr;
-use url::Url;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BotConfig<'a> {
@@ -30,7 +29,12 @@ struct BotContext {
 }
 
 pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
-    let client = Client::new(Url::parse(cfg.homeserver)?).await?;
+    info!("Creating client");
+    let client = Client::builder()
+        .homeserver_url(cfg.homeserver)
+        .build()
+        .await
+        .unwrap();
 
     info!("Logging in as {}", cfg.username);
     let res = client
