@@ -1,13 +1,16 @@
 use crate::{Database, Result};
 use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
-use matrix_sdk::room::Room;
-use matrix_sdk::{Client};
-use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent};
-use matrix_sdk::config::SyncSettings;
+use matrix_sdk::{
+    event_handler::Ctx,
+    room::Room,
+    config::SyncSettings,
+    Client,
+    ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent},
+    ruma::events::AnySyncMessageLikeEvent
+};
 
 use std::str::FromStr;
-use matrix_sdk::event_handler::Ctx;
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,9 +45,10 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
 
     // Perform an initial sync to set up state.
     let response = client.sync_once(SyncSettings::default()).await.unwrap();
-    // Add an event handler to be notified of incoming messages.
+    // Add event handlers to be notified of incoming messages.
     // We do this after the initial sync to avoid responding to messages before
     // the bot was running.
+    client.add_event_handler(on_any_message_like_event);
     client.add_event_handler(on_room_message);
     client.add_event_handler_context(BotContext { db });
 
@@ -57,6 +61,10 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     });
 
     Ok(())
+}
+
+async fn on_any_message_like_event(e: AnySyncMessageLikeEvent) {
+    info!("Received {:#?}", e);
 }
 
 async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<BotContext>) {
