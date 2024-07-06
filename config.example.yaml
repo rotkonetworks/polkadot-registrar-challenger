@@ -9,11 +9,13 @@ listener:
     - network: polkadot
       endpoint: ws://localhost:8001
   matrix:
-    enabled: false
-    homeserver: homeserver
-    username: username
-    password: password
-    admins: null
+    enabled: true
+    homeserver: https://matrix.org
+    username: regbot
+    password: abc123
+    admins:
+      - '@sara:matrix.org'
+      - '@bill:matrix.org'
   display_name:
     enabled: true
     limit: 0.85
