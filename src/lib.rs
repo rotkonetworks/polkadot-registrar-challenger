@@ -58,6 +58,7 @@ struct DatabaseConfig {
     pub name: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct ListenerConfig {
@@ -127,10 +128,10 @@ pub async fn run() -> Result<()> {
             ).await?;
         }
 
-        info!("Connecting to watchers");
-        let watchers = config.watchers.clone();
-        let dn_config = config.display_name.clone();
-        watcher::open_connections(db, watchers, dn_config).await?;
+        // info!("Connecting to watchers");
+        // let watchers = config.watchers.clone();
+        // let dn_config = config.display_name.clone();
+        // watcher::open_connections(db, watchers, dn_config).await?;
     }
 
     info!("Setup completed");
