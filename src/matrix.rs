@@ -1,4 +1,6 @@
 use crate::{Database, Result};
+use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
+
 use matrix_sdk::events::room::member::MemberEventContent;
 use matrix_sdk::events::room::message::{MessageEventContent, MessageType, TextMessageEventContent};
 use matrix_sdk::events::{AnyMessageEventContent, StrippedStateEvent, SyncMessageEvent};
@@ -7,30 +9,31 @@ use matrix_sdk::{Client, ClientConfig, EventHandler, SyncSettings};
 use std::str::FromStr;
 use tokio::time::{self, Duration};
 use url::Url;
-use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
 const REJOIN_DELAY: u64 = 10;
 const REJOIN_MAX_ATTEMPTS: usize = 5;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListenerConfig<'a> {
+    pub homeserver: &'a str,
+    pub username: &'a str,
+    pub password: &'a str,
+    pub db_path: &'a str,
+    pub admins: Vec<Nickname>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Nickname(String);
 
-pub async fn start_listener(
-    db: Database,
-    homeserver: &str,
-    username: &str,
-    password: &str,
-    db_path: &str,
-    admins: Vec<Nickname>,
-) -> Result<()> {
+pub async fn start_listener<'a>(db: Database, cfg: ListenerConfig<'a>) -> Result<()> {
     info!("Setting up client");
-    let client_config = ClientConfig::new().store_path(db_path);
-    let homeserver = Url::parse(homeserver)?;
+    let client_config = ClientConfig::new().store_path(cfg.db_path);
+    let homeserver = Url::parse(cfg.homeserver)?;
     let client = Client::new_with_config(homeserver, client_config)?;
 
     info!("Login with credentials");
     client
-        .login(username, password, None, Some("w3f-registrar-bot"))
+        .login(cfg.username, cfg.password, None, Some("w3f-registrar-bot"))
         .await?;
 
     info!("Syncing client");
@@ -39,7 +42,7 @@ pub async fn start_listener(
     client.set_event_handler(Box::new(Listener::new(
         client.clone(),
         db,
-        admins,
+        cfg.admins,
     ))).await;
 
     // Start backend syncing service
@@ -77,7 +80,7 @@ impl Listener {
 #[async_trait]
 impl EventHandler for Listener {
     async fn on_room_message(&self, room: Room, event: &SyncMessageEvent<MessageEventContent>) {
-        info!("Received message from {}", event.sender);
+        info!("Received room message event {:#?}", event);
 
         if let Room::Joined(room) = room {
             let msg_body = if let SyncMessageEvent {

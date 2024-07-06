@@ -123,11 +123,13 @@ pub async fn run() -> Result<()> {
             let config = config.matrix;
             matrix::start_listener(
                 db.clone(),
-                &config.homeserver,
-                &config.username,
-                &config.password,
-                &config.db_path,
-                config.admins.unwrap_or_default(),
+                matrix::ListenerConfig {
+                    homeserver: &config.homeserver,
+                    username: &config.username,
+                    password: &config.password,
+                    db_path: &config.db_path,
+                    admins: config.admins.unwrap_or_default(),
+                }
             ).await?;
         }
 
