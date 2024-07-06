@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::{Database, Result};
 use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
@@ -11,9 +9,6 @@ use matrix_sdk::config::SyncSettings;
 use std::str::FromStr;
 use matrix_sdk::event_handler::Ctx;
 use url::Url;
-
-const REJOIN_DELAY: u64 = 10;
-const REJOIN_MAX_ATTEMPTS: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BotConfig<'a> {
