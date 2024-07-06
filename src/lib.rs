@@ -108,16 +108,13 @@ pub async fn run() -> Result<()> {
         .with_env_filter(format!("system={}", config.log_level.as_str()))
         .init();
 
-    info!("Starting registrar service");
-
-    info!("Initializing connection to database");
+    info!("Connecting to the database");
     let db = Database::new(&db_config.uri, &db_config.name).await?;
     db.connectivity_check().await?;
 
     if let Some(config) = config.listener {
-        info!("Starting listener");
-
         if config.matrix.enabled {
+            info!("Starting Matrix bot");
             let config = config.matrix;
             matrix::start_bot(
                 db.clone(),
@@ -130,6 +127,7 @@ pub async fn run() -> Result<()> {
             ).await?;
         }
 
+        info!("Connecting to watchers");
         let watchers = config.watchers.clone();
         let dn_config = config.display_name.clone();
         watcher::open_connections(db, watchers, dn_config).await?;

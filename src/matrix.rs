@@ -57,7 +57,9 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     // that sync token to `sync`.
     info!("Entering sync loop");
     let settings = SyncSettings::default().token(response.next_batch);
-    client.sync(settings).await?;
+    actix::spawn(async move {
+        client.sync(settings).await.unwrap();
+    });
 
     Ok(())
 }
@@ -89,6 +91,7 @@ async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<B
             timestamp: Timestamp::now(),
             values: vec![text.body.into()],
         };
+
         match ctx.db.verify_message(&msg).await {
             Err(e) => {
                 info!("Message verification failed: {:}", e);
