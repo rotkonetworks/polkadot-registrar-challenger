@@ -1,14 +1,15 @@
 use crate::{Database, Result};
 use crate::watcher::{ChainAddress, ChainName, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
-use matrix_sdk::{
-    event_handler::Ctx,
-    room::Room,
-    config::SyncSettings,
-    Client,
-    ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent},
-    ruma::events::AnySyncMessageLikeEvent
-};
+use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::Client;
+use matrix_sdk::config::SyncSettings;
+use matrix_sdk::room::Room;
+use matrix_sdk::event_handler::Ctx;
+use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
+use matrix_sdk::encryption::{BackupDownloadStrategy, EncryptionSettings};
 
 use std::str::FromStr;
 
@@ -32,9 +33,12 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     info!("Creating client");
     let client = Client::builder()
         .homeserver_url(cfg.homeserver)
-        .build()
-        .await
-        .unwrap();
+        .with_encryption_settings(EncryptionSettings {
+            auto_enable_cross_signing: true,
+            auto_enable_backups: true,
+            backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
+        })
+        .build().await.unwrap();
 
     info!("Logging in as {}", cfg.username);
     let res = client
