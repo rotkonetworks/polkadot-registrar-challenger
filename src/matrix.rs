@@ -43,7 +43,8 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     info!("Logging in as {}", cfg.username);
     let res = client
         .matrix_auth()
-        .login_username(cfg.username, cfg.password)
+        .login_username(cfg.username, cfg.password).device_id("YMJSXTDBWW")
+        .initial_device_display_name("w3-reg-bot")
         .await?;
 
     info!(
