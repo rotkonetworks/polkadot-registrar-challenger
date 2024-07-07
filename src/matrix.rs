@@ -38,12 +38,13 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
             auto_enable_backups: true,
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
         })
+        .sqlite_store("/tmp/matrix", None)
         .build().await.unwrap();
 
     info!("Logging in as {}", cfg.username);
     let res = client
         .matrix_auth()
-        .login_username(cfg.username, cfg.password).device_id("YMJSXTDBWW")
+        .login_username(cfg.username, cfg.password).device_id("WPIDSGGRQO")
         .initial_device_display_name("w3-reg-bot")
         .await?;
 
@@ -51,6 +52,33 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
         "Logged in with device ID {} and access token {}",
         res.device_id, res.access_token
     );
+
+    // Open the store.
+    let secret_store = client
+        .encryption()
+        .secret_storage()
+        .open_secret_store("EsU3 dBSV PRkY BuJ3 SktN n1ou 3Yxm oLQm 4ayB ooYM 5idz xF59")
+        .await?;
+
+    // Import the secrets.
+    secret_store.import_secrets().await?;
+
+    // Our own device should now be verified.
+    let device = client
+        .encryption()
+        .get_own_device()
+        .await?
+        .expect("We should be able to retrieve our own device");
+
+    info!("device.is_cross_signed_by_owner: {:?}", device.is_cross_signed_by_owner());
+
+    let status = client
+        .encryption()
+        .cross_signing_status()
+        .await
+        .expect("We should be able to check out cross-signing status");
+
+    println!("Cross-signing status: {:?}", status);
 
     // Perform an initial sync to set up state.
     let response = client.sync_once(SyncSettings::default()).await.unwrap();
