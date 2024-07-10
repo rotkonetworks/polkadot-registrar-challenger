@@ -8,10 +8,8 @@ extern crate async_trait;
 
 mod matrix;
 mod watcher;
-mod database;
-mod display_name;
 
-use database::Database;
+use watcher::Database;
 use watcher::ChainName;
 
 use actix::clock::sleep;
