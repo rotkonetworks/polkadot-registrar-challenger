@@ -45,7 +45,7 @@ const DISPLAY_NAMES_INTERVAL: u64 = 1;
 #[cfg(test)]
 const JUDGEMENT_CANDIDATES_INTERVAL: u64 = 1;
 
-pub async fn open_connections(
+pub async fn connect_to_watchers(
     db: Database,
     watchers: Vec<WatcherConfig>,
     dn_config: DisplayNameConfig,

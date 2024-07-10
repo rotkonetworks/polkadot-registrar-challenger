@@ -7,10 +7,10 @@ extern crate serde;
 extern crate async_trait;
 
 mod matrix;
-mod watcher;
+mod registrar;
 
-use watcher::Database;
-use watcher::ChainName;
+use registrar::Database;
+use registrar::ChainName;
 
 use actix::clock::sleep;
 use matrix::Nickname;
@@ -129,7 +129,7 @@ pub async fn run() -> Result<()> {
         info!("Connecting to watchers");
         let watchers = config.watchers.clone();
         let dn_config = config.display_name.clone();
-        watcher::open_connections(db, watchers, dn_config).await?;
+        registrar::connect_to_watchers(db, watchers, dn_config).await?;
     }
 
     info!("Setup completed");

@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::watcher::{ChainAddress, ChainName, Database, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
+use crate::registrar::{ChainAddress, ChainName, Database, ExternalMessage, ExternalMessageType, IdentityContext, RawFieldName, Response, Timestamp};
 
 use matrix_sdk::ruma::events::room::message::MessageType;
 use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
