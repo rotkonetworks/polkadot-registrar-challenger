@@ -1,30 +1,10 @@
 log_level: info
-db:
-  uri: mongodb://localhost:27017/
-  name: registrar_db
-listener:
-  watchers:
-    - network: kusama
-      endpoint: ws://localhost:8000
-    - network: polkadot
-      endpoint: ws://localhost:8001
-  matrix:
-    enabled: true
-    homeserver: https://matrix.org
-    username: regbot
-    password: abc123
-    security_key: 'EfT0 1WXL nIi8 v1Zx 15c8 B8Ux bKdS fLUZ 5uVk zje7 KYFj ZiLf'
-    admins:
-      - '@sara:matrix.org'
-      - '@bill:matrix.org'
-  display_name:
-    enabled: true
-    limit: 0.85
-# REMOVED FOR NOW:
-#notifier:
-#  api_address: 0.0.0.0:8000
-#  cors_allow_origin:
-#    - 'https://mydomain.com'
-#  display_name:
-#    enabled: true
-#    limit: 0.85
+matrix:
+  enabled: true
+  homeserver: https://matrix.org
+  username: regbot
+  password: abc123
+  security_key: 'EfT0 1WXL nIi8 v1Zx 15c8 B8Ux bKdS fLUZ 5uVk zje7 KYFj ZiLf'
+  admins:
+    - '@sara:matrix.org'
+    - '@bill:matrix.org'
