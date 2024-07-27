@@ -4,6 +4,7 @@ use crate::registrar::{ChainAddress, ChainName, Database, ExternalMessage, Exter
 use matrix_sdk::ruma::events::room::message::MessageType;
 use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
+use matrix_sdk::ruma::events::room::member::StrippedRoomMemberEvent;
 use matrix_sdk::Client;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::room::Room;
@@ -11,6 +12,7 @@ use matrix_sdk::event_handler::Ctx;
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::encryption::{BackupDownloadStrategy, EncryptionSettings};
 use matrix_sdk::matrix_auth::MatrixSession;
+use tokio::time::{sleep, Duration};
 
 use std::path::Path;
 use std::str::FromStr;
@@ -78,6 +80,7 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     // We do this after the initial sync to avoid responding to messages before
     // the bot was running.
     client.add_event_handler(on_any_message_like_event);
+    client.add_event_handler(on_stripped_state_member);
     client.add_event_handler(on_room_message);
     client.add_event_handler_context(BotContext { db });
 
@@ -94,6 +97,37 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
 
 async fn on_any_message_like_event(e: AnySyncMessageLikeEvent) {
     info!("Received {:#?}", e);
+}
+
+async fn on_stripped_state_member(
+    event: StrippedRoomMemberEvent,
+    client: Client,
+    room: Room,
+) {
+    if event.state_key != client.user_id().unwrap() {
+        return;
+    }
+
+    tokio::spawn(async move {
+        info!("Joining room {}", room.room_id());
+        let mut delay = 2;
+
+        while let Err(err) = room.join().await {
+            // retry auto join due to synapse sending invites, before the
+            // invited user can join for more information see
+            // https://github.com/matrix-org/synapse/issues/4345
+            info!("Failed to join room {} ({err:?}), retrying in {delay}s", room.room_id());
+
+            sleep(Duration::from_secs(delay)).await;
+            delay *= 2;
+
+            if delay > 3600 {
+                info!("Can't join room {} ({err:?})", room.room_id());
+                break;
+            }
+        }
+        info!("Successfully joined room {}", room.room_id());
+    });
 }
 
 async fn on_room_message(e: OriginalSyncRoomMessageEvent, room: Room, ctx: Ctx<BotContext>) {
