@@ -10,8 +10,12 @@ use matrix_sdk::room::Room;
 use matrix_sdk::event_handler::Ctx;
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::encryption::{BackupDownloadStrategy, EncryptionSettings};
+use matrix_sdk::matrix_auth::MatrixSession;
 
+use std::path::Path;
 use std::str::FromStr;
+
+const STATE_DIR: &str = "/tmp/matrix";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BotConfig<'a> {
@@ -30,9 +34,13 @@ struct BotContext {
 }
 
 pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
+    let state_dir = Path::new(STATE_DIR);
+    let session_path = state_dir.join("session.json");
+
     info!("Creating client");
     let client = Client::builder()
         .homeserver_url(cfg.homeserver)
+        .sqlite_store(STATE_DIR, None)
         .with_encryption_settings(EncryptionSettings {
             auto_enable_cross_signing: true,
             auto_enable_backups: true,
@@ -40,19 +48,31 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
         })
         .build().await.unwrap();
 
-    info!("Logging in as {}", cfg.username);
-    let res = client
-        .matrix_auth()
-        .login_username(cfg.username, cfg.password)
-        .initial_device_display_name("w3-reg-bot")
-        .await?;
+    if session_path.exists() {
+        info!("Restoring session in {}", session_path.display());
+        let session = tokio::fs::read_to_string(session_path).await?;
+        let session: MatrixSession = serde_json::from_str(&session)?;
+        client.restore_session(session).await?;
+    } else {
+        info!("Logging in as {}", cfg.username);
+        client
+            .matrix_auth()
+            .login_username(cfg.username, cfg.password)
+            .initial_device_display_name("w3-reg-bot")
+            .await?;
 
-    info!(
-        "Logged in with device ID {} and access token {}",
-        res.device_id, res.access_token
-    );
+        info!("Writing session to {}", session_path.display());
+        let session = client.matrix_auth().session().expect("Session missing");
+        let session = serde_json::to_string(&session)?;
+        tokio::fs::write(session_path, session).await?;
+    }
+
+    if let Some(device_id) = client.device_id() {
+        info!("Logged in with device ID {}", device_id);
+    }
 
     // Perform an initial sync to set up state.
+    info!("Performing initial sync");
     let response = client.sync_once(SyncSettings::default()).await.unwrap();
     // Add event handlers to be notified of incoming messages.
     // We do this after the initial sync to avoid responding to messages before
@@ -63,7 +83,7 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
 
     // Since we called `sync_once` before we entered our sync loop we must pass
     // that sync token to `sync`.
-    info!("Entering sync loop");
+    info!("Listening for messages...");
     let settings = SyncSettings::default().token(response.next_batch);
     actix::spawn(async move {
         client.sync(settings).await.unwrap();
