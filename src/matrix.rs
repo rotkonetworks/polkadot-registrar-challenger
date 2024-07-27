@@ -24,6 +24,7 @@ pub struct BotConfig<'a> {
     pub homeserver: &'a str,
     pub username: &'a str,
     pub password: &'a str,
+    pub security_key: &'a str,
     pub admins: Vec<Nickname>,
 }
 
@@ -83,6 +84,16 @@ pub async fn start_bot<'a>(db: Database, cfg: BotConfig<'a>) -> Result<()> {
     client.add_event_handler(on_stripped_state_member);
     client.add_event_handler(on_room_message);
     client.add_event_handler_context(BotContext { db });
+
+    // Import secrets. This should enable cross-signing and verify the session.
+    info!("Importing secrets");
+    let secret_store = client
+        .encryption()
+        .secret_storage()
+        .open_secret_store(cfg.security_key).await?;
+    secret_store.import_secrets().await?;
+
+    info!("{:#?}", client.encryption().cross_signing_status().await.unwrap());
 
     // Since we called `sync_once` before we entered our sync loop we must pass
     // that sync token to `sync`.
