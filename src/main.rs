@@ -39,7 +39,6 @@ fn open_config() -> Result<Config, anyhow::Error> {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
 struct Config {
     pub log_level: String,
     pub matrix: matrix::BotConfig,
