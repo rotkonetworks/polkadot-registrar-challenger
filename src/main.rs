@@ -27,18 +27,17 @@ pub async fn main() -> Result<(), anyhow::Error> {
 }
 
 fn open_config() -> Result<Config, anyhow::Error> {
-    let content = fs::read_to_string("config.yaml")
+    let content = fs::read_to_string("config.toml")
         .map_err(|_| {
-            anyhow!("Failed to open config at 'config.yaml'.")
+            anyhow!("Failed to open config at `config.toml`.")
         })?;
 
-    let config = serde_yaml::from_str::<Config>(&content)
+    let config = toml::from_str::<Config>(&content)
         .map_err(|err| anyhow!("Failed to parse config: {:?}", err))?;
 
     Ok(config)
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct Config {

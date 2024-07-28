@@ -1,7 +1,7 @@
 target
 www/dist
 www/build
-config.yaml
+config.toml
 node_modules
 .idea
 .DS_Store
