@@ -11,7 +11,7 @@ use tracing::Level;
 use std::fs;
 
 #[tokio::main]
-pub async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<(), anyhow::Error> {
     let config = open_config()?;
 
     tracing_subscriber::fmt()
