@@ -1,5 +1,3 @@
-use crate::Result;
-
 use matrix_sdk::ruma::events::room::message::MessageType;
 use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
 use matrix_sdk::ruma::events::room::member::StrippedRoomMemberEvent;
@@ -9,7 +7,8 @@ use matrix_sdk::room::Room;
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::encryption::{BackupDownloadStrategy, EncryptionSettings};
 use matrix_sdk::matrix_auth::MatrixSession;
-use tokio::time::{sleep, Duration};
+use tokio::time::sleep;
+use tokio::time::Duration;
 
 use std::path::Path;
 
@@ -27,7 +26,7 @@ pub struct BotConfig<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Nickname(String);
 
-pub async fn start_bot<'a>(cfg: BotConfig<'a>) -> Result<()> {
+pub async fn start_bot<'a>(cfg: BotConfig<'a>) -> Result<(), anyhow::Error> {
     let state_dir = Path::new(STATE_DIR);
     let session_path = state_dir.join("session.json");
 
@@ -89,9 +88,7 @@ pub async fn start_bot<'a>(cfg: BotConfig<'a>) -> Result<()> {
     // that sync token to `sync`.
     info!("Listening for messages...");
     let settings = SyncSettings::default().token(response.next_batch);
-    actix::spawn(async move {
-        client.sync(settings).await.unwrap();
-    });
+    client.sync(settings).await?;
 
     Ok(())
 }
