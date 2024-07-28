@@ -1,10 +1,4 @@
 target
-www/dist
-www/build
 config.toml
-node_modules
 .idea
 .DS_Store
-
-# Adapter state
-matrix
