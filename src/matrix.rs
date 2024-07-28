@@ -14,19 +14,19 @@ use std::path::Path;
 
 const STATE_DIR: &str = "/tmp/matrix";
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct BotConfig<'a> {
-    pub homeserver: &'a str,
-    pub username: &'a str,
-    pub password: &'a str,
-    pub security_key: &'a str,
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct BotConfig {
+    pub homeserver: String,
+    pub username: String,
+    pub password: String,
+    pub security_key: String,
     pub admins: Vec<Nickname>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Nickname(String);
 
-pub async fn start_bot<'a>(cfg: BotConfig<'a>) -> Result<(), anyhow::Error> {
+pub async fn start_bot(cfg: BotConfig) -> Result<(), anyhow::Error> {
     let state_dir = Path::new(STATE_DIR);
     let session_path = state_dir.join("session.json");
 
@@ -50,7 +50,7 @@ pub async fn start_bot<'a>(cfg: BotConfig<'a>) -> Result<(), anyhow::Error> {
         info!("Logging in as {}", cfg.username);
         client
             .matrix_auth()
-            .login_username(cfg.username, cfg.password)
+            .login_username(cfg.username, cfg.password.as_str())
             .initial_device_display_name("w3-reg-bot")
             .await?;
 
@@ -79,7 +79,7 @@ pub async fn start_bot<'a>(cfg: BotConfig<'a>) -> Result<(), anyhow::Error> {
     let secret_store = client
         .encryption()
         .secret_storage()
-        .open_secret_store(cfg.security_key).await?;
+        .open_secret_store(cfg.security_key.as_str()).await?;
     secret_store.import_secrets().await?;
 
     info!("{:#?}", client.encryption().cross_signing_status().await.unwrap());

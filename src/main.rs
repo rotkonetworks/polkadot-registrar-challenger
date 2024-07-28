@@ -6,7 +6,6 @@ extern crate anyhow;
 extern crate serde;
 
 mod matrix;
-use matrix::Nickname;
 
 use tracing::Level;
 use std::fs;
@@ -22,14 +21,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     info!("Starting Matrix bot");
-    let config = config.matrix;
-    matrix::start_bot(matrix::BotConfig {
-        homeserver: &config.homeserver,
-        username: &config.username,
-        password: &config.password,
-        security_key: &config.security_key,
-        admins: config.admins.unwrap_or_default(),
-    }).await?;
+    matrix::start_bot(config.matrix).await?;
 
     Ok(())
 }
@@ -51,15 +43,5 @@ fn open_config() -> Result<Config, anyhow::Error> {
 #[serde(rename_all = "snake_case")]
 struct Config {
     pub log_level: String,
-    pub matrix: MatrixConfig,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct MatrixConfig {
-    pub homeserver: String,
-    pub username: String,
-    pub password: String,
-    pub security_key: String,
-    pub admins: Option<Vec<Nickname>>,
+    pub matrix: matrix::BotConfig,
 }
