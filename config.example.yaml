@@ -1,6 +1,5 @@
 log_level: info
 matrix:
-  enabled: true
   homeserver: https://matrix.org
   username: regbot
   password: abc123

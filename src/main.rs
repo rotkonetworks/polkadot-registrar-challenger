@@ -21,17 +21,15 @@ pub async fn main() -> Result<(), anyhow::Error> {
             .expect("Failed to parse log level"))
         .init();
 
-    if config.matrix.enabled {
-        info!("Starting Matrix bot");
-        let config = config.matrix;
-        matrix::start_bot(matrix::BotConfig {
-            homeserver: &config.homeserver,
-            username: &config.username,
-            password: &config.password,
-            security_key: &config.security_key,
-            admins: config.admins.unwrap_or_default(),
-        }).await?;
-    }
+    info!("Starting Matrix bot");
+    let config = config.matrix;
+    matrix::start_bot(matrix::BotConfig {
+        homeserver: &config.homeserver,
+        username: &config.username,
+        password: &config.password,
+        security_key: &config.security_key,
+        admins: config.admins.unwrap_or_default(),
+    }).await?;
 
     Ok(())
 }
@@ -59,7 +57,6 @@ struct Config {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct MatrixConfig {
-    pub enabled: bool,
     pub homeserver: String,
     pub username: String,
     pub password: String,
